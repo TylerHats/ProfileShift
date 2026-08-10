@@ -14,7 +14,12 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>ProfileShift</AssemblyName>
     <RootNamespace>ProfileShift</RootNamespace>
+    <ApplicationIcon>ProfileShiftIcon.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="ProfileShiftIcon.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="YamlDotNet" Version="15.1.4" />

@@ -1,10 +1,5 @@
 # Hat's ProfileShift 🚀
 
-![.NET 8.0](https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square&logo=dotnet)
-![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows)
-![Deployment](https://img.shields.io/badge/Deployment-Single--File%20Portable-43B581?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-blue.style=flat-square)
-
 **ProfileShift** is a high-performance, open-source Windows user profile migration utility compiled as a portable single-file `.exe`. Designed for IT administrators, MSP technicians, and power users, ProfileShift facilitates backing up, transferring, and restoring Windows user profiles, web browser data, wallpaper, system theme personalizations, taskbar pins, start menu layouts, network drive mappings, printers, default application associations, and environment variables.
 
 ---
