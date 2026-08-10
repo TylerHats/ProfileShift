@@ -1,0 +1,18 @@
+<Window x:Class="UserMoveTool.UI.StagingOverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="User Setup Integration" Height="600" Width="800"
+        WindowStyle="None" WindowState="Maximized" Topmost="True"
+        Background="#005A9E" Cursor="Wait">
+    <Grid>
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="20">
+            <TextBlock Text="Setting things up for you..." 
+                       FontSize="36" FontFamily="Segoe UI Light" Foreground="White" 
+                       HorizontalAlignment="Center" Margin="0,0,0,20"/>
+            <TextBlock x:Name="StatusLabel" Text="Please wait while we integrate your profile. This might take a few minutes." 
+                       FontSize="18" FontFamily="Segoe UI" Foreground="#CCE4F7" 
+                       HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,30"/>
+            <ProgressBar x:Name="OverlayProgressBar" Height="8" Width="400" IsIndeterminate="True" Foreground="#43B581" Background="#003D6B"/>
+        </StackPanel>
+    </Grid>
+</Window>

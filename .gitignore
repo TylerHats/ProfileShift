@@ -1,0 +1,22 @@
+## Visual Studio / .NET Build Artifacts
+[Bb]in/
+[Oo]bj/
+[Lls]og/
+[Ll]ogs/
+
+## User-specific files
+*.user
+*.userosscache
+*.sln.docstates
+
+## IDE / Editor directories
+.vs/
+.vscode/
+.idea/
+
+## Packages
+*.nupkg
+packages/
+
+## Publish outputs
+publish/
