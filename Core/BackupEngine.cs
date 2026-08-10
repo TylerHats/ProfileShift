@@ -107,6 +107,10 @@ namespace ProfileShift.Core
             SettingsMigrator.ExportDefaultAppAssociations(appAssocXml);
             OnLog("Default Application Associations exported.");
 
+            string wifiFolder = Path.Combine(backupDir, "WiFi_Profiles");
+            WifiProfileMigrator.ExportWifiProfiles(wifiFolder);
+            OnLog("Wi-Fi Network SSID Profiles exported.");
+
             string jsonConfigPath = Path.Combine(backupDir, "Migration.json");
             ConfigManager.SaveConfigJson(config, jsonConfigPath);
 

@@ -32,6 +32,18 @@ namespace ProfileShift.Core
                 string appAssoc = Path.Combine(backupSourcePath, "AppAssoc.xml");
                 if (File.Exists(appAssoc)) File.Copy(appAssoc, Path.Combine(publicStaging, "AppAssoc.xml"), true);
 
+                string wifiSrc = Path.Combine(backupSourcePath, "WiFi_Profiles");
+                if (Directory.Exists(wifiSrc))
+                {
+                    string wifiDst = Path.Combine(publicStaging, "WiFi_Profiles");
+                    Directory.CreateDirectory(wifiDst);
+                    foreach (var f in Directory.GetFiles(wifiSrc, "*.xml"))
+                    {
+                        File.Copy(f, Path.Combine(wifiDst, Path.GetFileName(f)), true);
+                    }
+                    WifiProfileMigrator.RestoreWifiProfiles(wifiDst);
+                }
+
                 string filesStaging = Path.Combine(publicStaging, "StagedFiles");
                 Directory.CreateDirectory(filesStaging);
 

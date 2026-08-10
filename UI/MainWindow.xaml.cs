@@ -268,6 +268,16 @@ namespace ProfileShift.UI
             }
         }
 
+        private void BtnViewLogs_Click(object sender, RoutedEventArgs e)
+        {
+            var lines = TxtLog.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var modal = new Views.LogViewerModal(lines)
+            {
+                Owner = this
+            };
+            modal.ShowDialog();
+        }
+
         private void Log(string message)
         {
             Dispatcher.Invoke(() =>
