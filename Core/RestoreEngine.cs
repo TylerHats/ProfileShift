@@ -5,7 +5,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace UserMoveTool.Core
+namespace ProfileShift.Core
 {
     public class RestoreEngine
     {
@@ -14,22 +14,23 @@ namespace UserMoveTool.Core
 
         public async Task<bool> StageRestoreAsync(string backupSourcePath, List<string> selectedUsers)
         {
-            string publicStaging = @"C:\System_Profile_Migration";
+            string publicStaging = @"C:\System_ProfileShift_Staging";
 
             try
             {
                 OnLog("Creating secure staging folder: " + publicStaging);
                 Directory.CreateDirectory(publicStaging);
 
-                // Set ACLs to SYSTEM and Administrators
                 RunCmd($"icacls \"{publicStaging}\" /inheritance:r /grant \"SYSTEM:(OI)(CI)F\" \"Administrators:(OI)(CI)F\" /T /C /Q");
 
-                // Copy Config files
                 string jsonConfig = Path.Combine(backupSourcePath, "Migration.json");
                 string yamlConfig = Path.Combine(backupSourcePath, "Migration.yaml");
 
                 if (File.Exists(jsonConfig)) File.Copy(jsonConfig, Path.Combine(publicStaging, "Migration.json"), true);
                 if (File.Exists(yamlConfig)) File.Copy(yamlConfig, Path.Combine(publicStaging, "Migration.yaml"), true);
+
+                string appAssoc = Path.Combine(backupSourcePath, "AppAssoc.xml");
+                if (File.Exists(appAssoc)) File.Copy(appAssoc, Path.Combine(publicStaging, "AppAssoc.xml"), true);
 
                 string filesStaging = Path.Combine(publicStaging, "StagedFiles");
                 Directory.CreateDirectory(filesStaging);
@@ -53,7 +54,6 @@ namespace UserMoveTool.Core
                     }
                 }
 
-                // Copy Non-Users root directories
                 if (Directory.Exists(dataRoot))
                 {
                     foreach (var rootDir in Directory.GetDirectories(dataRoot))
@@ -67,8 +67,7 @@ namespace UserMoveTool.Core
                     }
                 }
 
-                // Register Scheduled Task to trigger staging overlay on logon
-                string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "UserMoveTool.exe");
+                string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ProfileShift.exe");
                 string taskXml = $@"<?xml version=""1.0"" encoding=""UTF-16""?>
 <Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">
   <Triggers><LogonTrigger><Enabled>true</Enabled></LogonTrigger></Triggers>
@@ -80,7 +79,7 @@ namespace UserMoveTool.Core
                 string xmlPath = Path.Combine(Path.GetTempPath(), "MigrationTask.xml");
                 File.WriteAllText(xmlPath, taskXml, Encoding.Unicode);
 
-                RunCmd($"schtasks.exe /create /tn \"WindowsSetupIntegration\" /xml \"{xmlPath}\" /f");
+                RunCmd($"schtasks.exe /create /tn \"ProfileShiftSetupIntegration\" /xml \"{xmlPath}\" /f");
 
                 OnLog("Profile staging complete! Please log out and log back in to trigger profile setup.");
                 OnProgress(100);

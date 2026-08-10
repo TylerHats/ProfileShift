@@ -4,9 +4,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using UserMoveTool.Models;
+using ProfileShift.Models;
 
-namespace UserMoveTool.Core
+namespace ProfileShift.Core
 {
     public class BackupProgressEventArgs : EventArgs
     {
@@ -31,7 +31,7 @@ namespace UserMoveTool.Core
             string configFormat = "json")
         {
             string timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            string backupDir = Path.Combine(destinationFolder, $"HMT_Migration_{timeStamp}");
+            string backupDir = Path.Combine(destinationFolder, $"ProfileShift_Backup_{timeStamp}");
             string cDriveDir = Path.Combine(backupDir, "C_Drive");
             Directory.CreateDirectory(cDriveDir);
 
@@ -55,8 +55,11 @@ namespace UserMoveTool.Core
 
                 var uSelection = new UserSelection
                 {
-                    Settings = SettingsMigrator.ExtractUserSettings(user.Username)
+                    Settings = SettingsMigrator.ExtractUserSettings(user.Username),
+                    EnvironmentVariables = EnvironmentMigrator.ExtractUserEnvironmentVariables()
                 };
+
+                StartMenuMigrator.BackupStartMenuPins(user.ProfilePath, backupDir);
 
                 if (userFoldersMap.TryGetValue(user.Username, out var uFolders))
                 {
@@ -88,7 +91,18 @@ namespace UserMoveTool.Core
             long totalBytes = FolderScanner.CalculateTotalSize(foldersToCopy);
             OnLog($"Total estimated backup size: {Math.Round(totalBytes / 1073741824.0, 2)} GB");
 
-            // Write Config File
+            var spaceCheck = PreFlightChecker.CheckDestinationSpace(destinationFolder, totalBytes);
+            OnLog(spaceCheck.WarningMessage);
+            if (!spaceCheck.IsValid)
+            {
+                OnLog("Backup halted: Insufficient destination space.");
+                return false;
+            }
+
+            string appAssocXml = Path.Combine(backupDir, "AppAssoc.xml");
+            SettingsMigrator.ExportDefaultAppAssociations(appAssocXml);
+            OnLog("Default Application Associations exported.");
+
             string jsonConfigPath = Path.Combine(backupDir, "Migration.json");
             ConfigManager.SaveConfigJson(config, jsonConfigPath);
 
@@ -114,7 +128,7 @@ namespace UserMoveTool.Core
 
                 if (!Directory.Exists(folder)) continue;
 
-                string relativePath = folder.Substring(3); // Remove C:\
+                string relativePath = folder.Length >= 3 ? folder.Substring(3) : Path.GetFileName(folder);
                 string targetPath = Path.Combine(cDriveDir, relativePath);
 
                 await CopyDirectoryRobocopyAsync(folder, targetPath, cancellationToken);

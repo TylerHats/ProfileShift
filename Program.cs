@@ -4,11 +4,11 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using UserMoveTool.Core;
-using UserMoveTool.Models;
-using UserMoveTool.UI;
+using ProfileShift.Core;
+using ProfileShift.Models;
+using ProfileShift.UI;
 
-namespace UserMoveTool
+namespace ProfileShift
 {
     public class Program
     {
@@ -33,14 +33,13 @@ namespace UserMoveTool
                 }
             }
 
-            // Launch WPF GUI
             var guiApp = new Application();
             guiApp.Run(new MainWindow());
         }
 
         private static async Task RunCliAsync(List<string> args)
         {
-            Console.WriteLine("=== UserMoveTool CLI Engine ===");
+            Console.WriteLine("=== ProfileShift CLI Engine ===");
 
             string configPath = GetArgValue(args, "--config");
             string destPath = GetArgValue(args, "--dest");

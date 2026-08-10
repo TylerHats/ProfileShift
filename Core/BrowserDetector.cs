@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using UserMoveTool.Models;
+using ProfileShift.Models;
 
-namespace UserMoveTool.Core
+namespace ProfileShift.Core
 {
     public static class BrowserDetector
     {

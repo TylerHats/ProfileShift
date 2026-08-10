@@ -1,11 +1,11 @@
 using System;
 using System.IO;
 using System.Text.Json;
-using UserMoveTool.Models;
+using ProfileShift.Models;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace UserMoveTool.Core
+namespace ProfileShift.Core
 {
     public static class ConfigManager
     {

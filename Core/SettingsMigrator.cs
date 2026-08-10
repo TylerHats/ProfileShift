@@ -3,12 +3,49 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Microsoft.Win32;
-using UserMoveTool.Models;
+using ProfileShift.Models;
 
-namespace UserMoveTool.Core
+namespace ProfileShift.Core
 {
     public static class SettingsMigrator
     {
+        public static void ExportDefaultAppAssociations(string outputPath)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "dism.exe",
+                    Arguments = $"/Online /Export-DefaultAppAssociations:\"{outputPath}\"",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                };
+                using var p = Process.Start(psi);
+                p?.WaitForExit(10000);
+            }
+            catch { }
+        }
+
+        public static void ImportDefaultAppAssociations(string xmlPath)
+        {
+            try
+            {
+                if (File.Exists(xmlPath))
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "dism.exe",
+                        Arguments = $"/Online /Import-DefaultAppAssociations:\"{xmlPath}\"",
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    };
+                    using var p = Process.Start(psi);
+                    p?.WaitForExit(10000);
+                }
+            }
+            catch { }
+        }
+
         public static UserSettings ExtractUserSettings(string username)
         {
             var settings = new UserSettings();
@@ -101,7 +138,6 @@ namespace UserMoveTool.Core
 
                         if (string.IsNullOrWhiteSpace(name)) continue;
 
-                        // Exclude virtual system printers
                         if (name.Contains("Microsoft", StringComparison.OrdinalIgnoreCase) ||
                             name.Contains("OneNote", StringComparison.OrdinalIgnoreCase) ||
                             name.Contains("PDF", StringComparison.OrdinalIgnoreCase) ||

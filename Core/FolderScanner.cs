@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace UserMoveTool.Core
+namespace ProfileShift.Core
 {
     public static class FolderScanner
     {
@@ -57,7 +57,6 @@ namespace UserMoveTool.Core
                 }
             }
 
-            // Also add Quick Launch / TaskBar pins and AutomaticDestinations if present
             string taskbarPins = Path.Combine(userProfilePath, @"AppData\Roaming\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar");
             if (Directory.Exists(taskbarPins)) folders.Add(taskbarPins);
 

@@ -3,10 +3,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
-using UserMoveTool.Core;
-using UserMoveTool.Models;
+using ProfileShift.Core;
+using ProfileShift.Models;
 
-namespace UserMoveTool.UI
+namespace ProfileShift.UI
 {
     public partial class StagingOverlayWindow : Window
     {
@@ -23,7 +23,7 @@ namespace UserMoveTool.UI
 
         private async Task RunStagingProcessAsync()
         {
-            string publicStaging = @"C:\System_Profile_Migration";
+            string publicStaging = @"C:\System_ProfileShift_Staging";
             string jsonConfigPath = Path.Combine(publicStaging, "Migration.json");
             string yamlConfigPath = Path.Combine(publicStaging, "Migration.yaml");
 
@@ -90,18 +90,33 @@ namespace UserMoveTool.UI
             if (config.UserSelections.TryGetValue(matchedUser, out var uSelection))
             {
                 SettingsMigrator.ApplyUserSettings(uSelection.Settings);
+                if (uSelection.EnvironmentVariables != null && uSelection.EnvironmentVariables.Count > 0)
+                {
+                    EnvironmentMigrator.ApplyUserEnvironmentVariables(uSelection.EnvironmentVariables);
+                }
             }
+
+            StartMenuMigrator.RestoreStartMenuPins(userProfile, publicStaging);
+
+            string appAssocXml = Path.Combine(publicStaging, "AppAssoc.xml");
+            if (File.Exists(appAssocXml))
+            {
+                UpdateStatus("Restoring default application associations...");
+                SettingsMigrator.ImportDefaultAppAssociations(appAssocXml);
+            }
+
+            UpdateStatus("Generating Migration Summary report on Desktop...");
+            ReportGenerator.SaveReportToDesktop(config, matchedUser);
 
             UpdateStatus("Finalizing profile integration...");
             await Task.Delay(3000);
 
-            // Clean up scheduled task if no remaining users
             try
             {
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "schtasks.exe",
-                    Arguments = "/delete /tn \"WindowsSetupIntegration\" /f",
+                    Arguments = "/delete /tn \"ProfileShiftSetupIntegration\" /f",
                     CreateNoWindow = true,
                     UseShellExecute = false
                 })?.WaitForExit();

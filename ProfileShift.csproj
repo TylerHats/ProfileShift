@@ -12,8 +12,8 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <AssemblyName>UserMoveTool</AssemblyName>
-    <RootNamespace>UserMoveTool</RootNamespace>
+    <AssemblyName>ProfileShift</AssemblyName>
+    <RootNamespace>ProfileShift</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

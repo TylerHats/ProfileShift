@@ -7,11 +7,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Microsoft.Win32;
-using UserMoveTool.Core;
-using UserMoveTool.Models;
-using UserMoveTool.Utilities;
+using ProfileShift.Core;
+using ProfileShift.Models;
+using ProfileShift.Utilities;
 
-namespace UserMoveTool.UI
+namespace ProfileShift.UI
 {
     public partial class MainWindow : Window
     {
@@ -39,10 +39,16 @@ namespace UserMoveTool.UI
             });
         }
 
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             DwmHelper.EnableDarkModeTitleBar(this);
             LoadUserProfiles();
+
+            var updateInfo = await UpdateChecker.CheckForUpdatesAsync();
+            if (updateInfo != null && updateInfo.IsNewer)
+            {
+                Log($"Update Available: {updateInfo.TagName}. Download at {updateInfo.HtmlUrl}");
+            }
         }
 
         private void LoadUserProfiles()
@@ -106,6 +112,32 @@ namespace UserMoveTool.UI
                         LstRestoreUsers.ItemsSource = config.SelectedUsers;
                     }
                 }
+            }
+        }
+
+        private void BtnCustomizeFolders_Click(object sender, RoutedEventArgs e)
+        {
+            var selectedUsers = _userProfiles.Where(u => u.IsSelected).ToList();
+            var allFolders = new List<string>();
+
+            if (ChkRootData.IsChecked == true)
+            {
+                allFolders.AddRange(FolderScanner.GetRootDriveFolders());
+            }
+
+            foreach (var user in selectedUsers)
+            {
+                allFolders.AddRange(FolderScanner.GetUserSelectableFolders(user.ProfilePath));
+            }
+
+            var modal = new Views.FolderPickerModal(allFolders)
+            {
+                Owner = this
+            };
+
+            if (modal.ShowDialog() == true)
+            {
+                Log($"Custom folder selection updated: {modal.SelectedFolderPaths.Count} subfolders selected.");
             }
         }
 

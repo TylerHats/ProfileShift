@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace UserMoveTool.Models
+namespace ProfileShift.Models
 {
     public class MigrationConfig
     {
@@ -9,6 +9,10 @@ namespace UserMoveTool.Models
         public string SourceMachineName { get; set; } = string.Empty;
         public string SourceDomain { get; set; } = string.Empty;
         public DateTime MigrationTime { get; set; } = DateTime.Now;
+
+        public int RobocopyThreads { get; set; } = 16;
+        public string PreBackupHookScript { get; set; } = string.Empty;
+        public string PostRestoreHookScript { get; set; } = string.Empty;
 
         public List<string> SelectedUsers { get; set; } = new List<string>();
         public List<string> SelectedRootFolders { get; set; } = new List<string>();
@@ -24,6 +28,7 @@ namespace UserMoveTool.Models
         public List<string> Folders { get; set; } = new List<string>();
         public List<string> Browsers { get; set; } = new List<string>();
         public UserSettings Settings { get; set; } = new UserSettings();
+        public Dictionary<string, string> EnvironmentVariables { get; set; } = new Dictionary<string, string>();
     }
 
     public class UserSettings
