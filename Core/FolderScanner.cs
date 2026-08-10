@@ -80,32 +80,67 @@ namespace ProfileShift.Core
                 }
                 else if (Directory.Exists(path))
                 {
-                    totalBytes += GetDirectorySize(path);
+                    totalBytes += GetDirectoryStats(path, System.Threading.CancellationToken.None).Bytes;
                 }
             }
             return totalBytes;
         }
 
-        private static long GetDirectorySize(string directoryPath)
+        public static System.Threading.Tasks.Task<(long TotalBytes, long FileCount)> CalculateTotalStatsAsync(List<string> folderPaths, System.Threading.CancellationToken cancellationToken)
+        {
+            return System.Threading.Tasks.Task.Run(() =>
+            {
+                long totalBytes = 0;
+                long fileCount = 0;
+
+                foreach (var path in folderPaths)
+                {
+                    if (cancellationToken.IsCancellationRequested) break;
+
+                    if (File.Exists(path))
+                    {
+                        if (!ExclusionFilter.ShouldExcludeFile(path))
+                        {
+                            totalBytes += new FileInfo(path).Length;
+                            fileCount++;
+                        }
+                    }
+                    else if (Directory.Exists(path))
+                    {
+                        var (bytes, count) = GetDirectoryStats(path, cancellationToken);
+                        totalBytes += bytes;
+                        fileCount += count;
+                    }
+                }
+
+                return (totalBytes, fileCount);
+            }, cancellationToken);
+        }
+
+        private static (long Bytes, long Count) GetDirectoryStats(string directoryPath, System.Threading.CancellationToken cancellationToken)
         {
             long size = 0;
+            long count = 0;
             try
             {
                 var files = Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
                 foreach (var file in files)
                 {
-                    if (file.Contains(@"\OneDrive\") || file.Contains(@"\SharePoint\") || file.Contains(@"\Dropbox\"))
+                    if (cancellationToken.IsCancellationRequested) break;
+
+                    if (file.Contains(@"\OneDrive\") || file.Contains(@"\SharePoint\") || file.Contains(@"\Dropbox\") || ExclusionFilter.ShouldExcludeFile(file))
                         continue;
 
                     try
                     {
                         size += new FileInfo(file).Length;
+                        count++;
                     }
                     catch { }
                 }
             }
             catch { }
-            return size;
+            return (size, count);
         }
     }
 }

@@ -92,7 +92,9 @@
                         <CheckBox x:Name="ChkIntegrity" Content="Perform File Integrity Verification" IsChecked="True"/>
                         <Button x:Name="BtnCustomizeFolders" Content="Customize Subfolders (Tree View)..." Height="28" Margin="0,6,0,6" Background="#40444B" Click="BtnCustomizeFolders_Click"/>
 
-                        <Grid Margin="0,15,0,0">
+                        <TextBlock x:Name="LblLiveEstimate" Text="Selected: Calculating..." Foreground="#43B581" FontWeight="SemiBold" Margin="0,6,0,4"/>
+
+                        <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
@@ -135,7 +137,10 @@
 
         <!-- Status & Log Footer -->
         <StackPanel Grid.Row="2" Margin="0,10,0,0">
-            <TextBlock x:Name="TxtStatus" Text="Ready" Foreground="#D9D9D9" Margin="0,0,0,4"/>
+            <Grid Margin="0,0,0,4">
+                <TextBlock x:Name="TxtStatus" Text="Ready" Foreground="#D9D9D9" HorizontalAlignment="Left"/>
+                <TextBlock x:Name="TxtTelemetry" Text="" Foreground="#43B581" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+            </Grid>
             <ProgressBar x:Name="MainProgressBar" Height="12" Background="#40444B" Foreground="#43B581" Margin="0,0,0,8"/>
             <TextBox x:Name="TxtLog" Height="100" IsReadOnly="True" VerticalScrollBarVisibility="Auto" Background="#202225" Foreground="#D9D9D9" FontFamily="Consolas" FontSize="11"/>
         </StackPanel>

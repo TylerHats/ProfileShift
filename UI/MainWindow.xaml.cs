@@ -20,6 +20,8 @@ namespace ProfileShift.UI
         private BackupEngine _backupEngine = new BackupEngine();
         private RestoreEngine _restoreEngine = new RestoreEngine();
 
+        private CancellationTokenSource? _estimateCts;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -30,6 +32,10 @@ namespace ProfileShift.UI
             {
                 TxtStatus.Text = e.CurrentStatus;
                 MainProgressBar.Value = e.Percentage;
+                if (e.SpeedMbps > 0)
+                {
+                    TxtTelemetry.Text = $"Speed: {e.SpeedMbps:N2} MB/s | ETA: {e.EstimatedTimeRemaining:hh\\:mm\\:ss}";
+                }
             });
 
             _restoreEngine.LogMessage += (s, msg) => Log(msg);
@@ -43,11 +49,51 @@ namespace ProfileShift.UI
         {
             DwmHelper.EnableDarkModeTitleBar(this);
             LoadUserProfiles();
+            await UpdateLiveEstimateAsync();
 
             var updateInfo = await UpdateChecker.CheckForUpdatesAsync();
             if (updateInfo != null && updateInfo.IsNewer)
             {
                 Log($"Update Available: {updateInfo.TagName}. Download at {updateInfo.HtmlUrl}");
+            }
+        }
+
+        private async System.Threading.Tasks.Task UpdateLiveEstimateAsync()
+        {
+            _estimateCts?.Cancel();
+            _estimateCts = new CancellationTokenSource();
+            var token = _estimateCts.Token;
+
+            LblLiveEstimate.Text = "Selected: Calculating...";
+
+            var selectedUsers = _userProfiles.Where(u => u.IsSelected).ToList();
+            var foldersToScan = new List<string>();
+
+            if (ChkRootData?.IsChecked == true)
+            {
+                foldersToScan.AddRange(FolderScanner.GetRootDriveFolders());
+            }
+
+            foreach (var user in selectedUsers)
+            {
+                if (ChkUserProfiles?.IsChecked == true)
+                {
+                    foldersToScan.AddRange(FolderScanner.GetUserSelectableFolders(user.ProfilePath));
+                }
+            }
+
+            try
+            {
+                var (bytes, count) = await FolderScanner.CalculateTotalStatsAsync(foldersToScan, token);
+                if (!token.IsCancellationRequested)
+                {
+                    double gb = Math.Round(bytes / 1073741824.0, 2);
+                    LblLiveEstimate.Text = $"Selected: {count:N0} files ({gb} GB)";
+                }
+            }
+            catch
+            {
+                LblLiveEstimate.Text = "Selected: Calculation Error";
             }
         }
 

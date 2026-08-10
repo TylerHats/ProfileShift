@@ -14,6 +14,10 @@ namespace ProfileShift.Core
         public int Percentage { get; set; }
         public long BytesCopied { get; set; }
         public long TotalBytes { get; set; }
+        public double SpeedMbps { get; set; }
+        public TimeSpan ElapsedTime { get; set; }
+        public TimeSpan EstimatedTimeRemaining { get; set; }
+        public string CurrentFileName { get; set; } = string.Empty;
     }
 
     public class BackupEngine
