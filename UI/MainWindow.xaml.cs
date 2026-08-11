@@ -436,13 +436,56 @@ namespace ProfileShift.UI
                 }
             }
 
+            // Check if credential exports exist in the backup source
+            string credManagerFile = Path.Combine(src, "CredentialManager.dat");
+            string browserPwFile = Path.Combine(src, "BrowserPasswords.dat");
+            bool hasCredentials = File.Exists(credManagerFile) || File.Exists(browserPwFile);
+            string passphrase = string.Empty;
+
+            if (hasCredentials)
+            {
+                passphrase = PromptForPassphrase(
+                    "Credential Import Passphrase",
+                    "Saved credentials (passwords, RDP, etc.) were found in this backup.\n" +
+                    "Enter the passphrase set during backup to restore credentials for the current user.\n\n" +
+                    "If skipped, profile data will be restored without passwords.");
+
+                if (!string.IsNullOrEmpty(passphrase))
+                {
+                    string currentUsername = Environment.UserName;
+                    bool currentUserIsTarget = selectedUsers.Any(u => u.Equals(currentUsername, StringComparison.OrdinalIgnoreCase));
+
+                    if (currentUserIsTarget)
+                    {
+                        Log("Restoring credentials for current user session...");
+                        if (File.Exists(credManagerFile))
+                        {
+                            CredentialManagerExporter.ImportCredentials(src, passphrase, msg => Log(msg));
+                        }
+
+                        if (File.Exists(browserPwFile))
+                        {
+                            BrowserPasswordExporter.ImportBrowserPasswords(src, passphrase, msg => Log(msg));
+                        }
+                    }
+                    else
+                    {
+                        Log("Note: Credentials are only restorable to the active user session. Staging remaining profile data for target user(s).");
+                    }
+                }
+                else
+                {
+                    Log("Credential import skipped — no passphrase provided.");
+                }
+            }
+
             BtnStartRestore.IsEnabled = false;
             bool success = await _restoreEngine.StageRestoreAsync(src, selectedUsers);
             BtnStartRestore.IsEnabled = true;
 
             if (success)
             {
-                MessageBox.Show("Profile staging completed successfully! Log off and log in as the migrated user to finalize profile setup.", "Staging Ready", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Profile staging completed successfully! When target user(s) log in for the first time, profile integration will run automatically.", "Staging Complete", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
