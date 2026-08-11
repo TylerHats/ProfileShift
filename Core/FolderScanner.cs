@@ -23,7 +23,7 @@ namespace ProfileShift.Core
         public static List<string> GetRootDriveFolders()
         {
             var result = new List<string>();
-            string rootPath = @"C:\";
+            string rootPath = Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\";
             if (!Directory.Exists(rootPath)) return result;
 
             try
@@ -121,25 +121,51 @@ namespace ProfileShift.Core
         {
             long size = 0;
             long count = 0;
-            try
+            var dirQueue = new Queue<string>();
+            dirQueue.Enqueue(directoryPath);
+
+            while (dirQueue.Count > 0)
             {
-                var files = Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
-                foreach (var file in files)
+                if (cancellationToken.IsCancellationRequested) break;
+
+                string currentDir = dirQueue.Dequeue();
+
+                try
                 {
-                    if (cancellationToken.IsCancellationRequested) break;
-
-                    if (file.Contains(@"\OneDrive\") || file.Contains(@"\SharePoint\") || file.Contains(@"\Dropbox\") || ExclusionFilter.ShouldExcludeFile(file))
-                        continue;
-
-                    try
+                    foreach (var subDir in Directory.GetDirectories(currentDir))
                     {
-                        size += new FileInfo(file).Length;
-                        count++;
+                        string subName = Path.GetFileName(subDir);
+                        if (!subName.Equals("OneDrive", StringComparison.OrdinalIgnoreCase) &&
+                            !subName.Equals("SharePoint", StringComparison.OrdinalIgnoreCase) &&
+                            !subName.Equals("Dropbox", StringComparison.OrdinalIgnoreCase) &&
+                            !ExclusionFilter.ShouldExcludeDirectory(subDir))
+                        {
+                            dirQueue.Enqueue(subDir);
+                        }
                     }
-                    catch { }
                 }
+                catch { }
+
+                try
+                {
+                    foreach (var file in Directory.GetFiles(currentDir))
+                    {
+                        if (cancellationToken.IsCancellationRequested) break;
+
+                        if (!ExclusionFilter.ShouldExcludeFile(file))
+                        {
+                            try
+                            {
+                                size += new FileInfo(file).Length;
+                                count++;
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                catch { }
             }
-            catch { }
+
             return (size, count);
         }
     }

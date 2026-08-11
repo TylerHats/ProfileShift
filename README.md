@@ -9,13 +9,19 @@
 - **Standalone Single-File Executable**: Compiles into a single `ProfileShift.exe` binary with zero external runtime or framework installation requirements.
 - **Dual Interface Modes**:
   - **Modern Dark WPF GUI**: Built with a sleek dark theme (`#2F3136`) and native Windows DWM dark title bars.
-  - **Silent Headless CLI**: Command-line orchestration (`--backup`, `--restore`, `--config`, `--silent`) supporting **JSON** and **YAML** configuration files.
+  - **Silent Headless CLI**: Command-line orchestration (`--backup`, `--restore`, `--config`, `--passphrase`, `--silent`) supporting **JSON** and **YAML** configuration files.
+- **Saved Credential Migration**:
+  - **Windows Credential Manager & Vault**: Native Win32 `CredEnumerateW` / `CredWriteW` integration to migrate RDP saved passwords, network drive credentials, Windows VPN logins, and generic app tokens.
+  - **Browser Password Migration**: Multi-profile password export for Chrome, Edge, Brave, Vivaldi, and Opera with dual-mode support (Native automated extraction or zero-AV-risk Browser-Assisted mode).
+  - **Portable AES-256-GCM Encryption**: All exported credentials are encrypted with a user-defined passphrase (PBKDF2-SHA256, 100k iterations) so backups can be restored across different PCs, domain joins, or local accounts.
+- **Smart Split-Process UAC Elevation**: Main process remains in the user session context so Win32 credential APIs operate correctly; system-level tasks (DISM default app associations, Wi-Fi profile exports) are automatically delegated to an elevated helper subprocess. Dynamic UAC 🛡️ shield indicators appear only when admin-requiring options are selected.
 - **Web Browser Data Selector**: Auto-detects Chrome, Edge, Firefox, Opera, Brave, and Vivaldi profiles per user.
 - **Granular Folder & Subdirectory Tree View**: Interactive tree-view modal allowing selective inclusion/exclusion of specific subfolders.
 - **Start Menu & Taskbar Pin Migration**: Preserves Windows 10 `LayoutModification.xml`, Windows 11 `start.bin`, and Taskbar shortcuts.
 - **Default Application Associations (DISM)**: Exports and imports file handler defaults for web browsers, PDFs, and media players.
 - **Pre-Flight Disk Space Checks**: Queries available target drive space before executing file transfers.
-- **ForensIT-Style Logon Staging**: Staging engine (`C:\System_ProfileShift_Staging`) with a full-screen, top-most logon overlay window that locks input and displays real-time profile restoration progress.
+- **Instant Live Shell Refresh**: Applies desktop wallpaper, theme personalizations, file associations (`SHChangeNotify`, `WM_SETTINGCHANGE`), and taskbar pins instantly without forcing a user logoff.
+- **ForensIT-Style Logon Staging**: Staging engine (`C:\System_ProfileShift_Staging`) with a full-screen, top-most logon overlay window that locks input and displays real-time profile restoration progress for first sign-ins.
 - **User Environment Variables (`HKCU\Environment`)**: Restores user environment variables and broadcasts `WM_SETTINGCHANGE` for instant applicability without requiring a system reboot.
 - **Desktop HTML Summary Reports**: Generates a clean, standalone HTML summary report (`ProfileShift_Summary.html`) placed directly on the user's Desktop.
 - **GitHub Auto-Update Notifier**: Checks GitHub API on startup to notify users of new releases.

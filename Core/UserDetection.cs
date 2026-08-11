@@ -22,7 +22,8 @@ namespace ProfileShift.Core
         public static List<UserProfile> GetLocalUserProfiles()
         {
             var profiles = new List<UserProfile>();
-            string usersDir = @"C:\Users";
+            string systemDrive = Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\";
+            string usersDir = Path.Combine(systemDrive, "Users");
 
             if (Directory.Exists(usersDir))
             {

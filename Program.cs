@@ -112,11 +112,13 @@ namespace ProfileShift
 
                 bool exportCreds = args.Contains("--export-credentials");
                 bool exportBrowserPw = args.Contains("--export-browser-passwords");
+                string passphrase = GetArgValue(args, "--passphrase");
 
                 await engine.RunBackupAsync(destPath, users, rootFolders, userFoldersMap, userBrowsersMap, CancellationToken.None,
                     exportCredentialManager: exportCreds,
                     exportBrowserPasswords: exportBrowserPw,
-                    browserPasswordMode: "native");
+                    browserPasswordMode: "native",
+                    credentialPassphrase: passphrase);
             }
             else if (args.Contains("--restore"))
             {
@@ -135,6 +137,15 @@ namespace ProfileShift
                 MigrationConfig? loaded = ConfigManager.LoadAutoConfig(cfg);
                 if (loaded != null)
                 {
+                    string passphrase = GetArgValue(args, "--passphrase");
+                    if (!string.IsNullOrEmpty(passphrase))
+                    {
+                        string credManagerFile = Path.Combine(srcPath, "CredentialManager.dat");
+                        string browserPwFile = Path.Combine(srcPath, "BrowserPasswords.dat");
+                        if (File.Exists(credManagerFile)) CredentialManagerExporter.ImportCredentials(srcPath, passphrase, msg => Console.WriteLine($"[LOG] {msg}"));
+                        if (File.Exists(browserPwFile)) BrowserPasswordExporter.ImportBrowserPasswords(srcPath, passphrase, msg => Console.WriteLine($"[LOG] {msg}"));
+                    }
+
                     await restoreEngine.StageRestoreAsync(srcPath, loaded.SelectedUsers);
                 }
             }

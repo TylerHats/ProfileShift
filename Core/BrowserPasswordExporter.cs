@@ -244,8 +244,10 @@ namespace ProfileShift.Core
                 using var reader = cmd.ExecuteReader();
                 while (reader.Read())
                 {
-                    string url = reader.GetString(0);
-                    string username = reader.GetString(1);
+                    string url = reader.IsDBNull(0) ? string.Empty : reader.GetString(0);
+                    string username = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
+
+                    if (reader.IsDBNull(2)) continue;
                     byte[] encPassword = (byte[])reader.GetValue(2);
 
                     if (encPassword.Length == 0)
@@ -529,7 +531,8 @@ namespace ProfileShift.Core
 
                     foreach (var entry in group)
                     {
-                        string name = new Uri(entry.Url).Host;
+                        string name = Uri.TryCreate(entry.Url, UriKind.Absolute, out var uri) ? uri.Host : entry.Url;
+                        if (string.IsNullOrEmpty(name)) name = "Saved Password";
                         sb.AppendLine($"{EscapeCsv(name)},{EscapeCsv(entry.Url)},{EscapeCsv(entry.Username)},{EscapeCsv(entry.Password)},");
                     }
 

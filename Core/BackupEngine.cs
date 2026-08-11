@@ -184,9 +184,11 @@ namespace ProfileShift.Core
                 int percent = 10 + (int)((double)count / foldersToCopy.Count * 90);
                 OnProgress($"Copying ({count}/{foldersToCopy.Count}): {Path.GetFileName(folder)}", percent, copiedBytes, totalBytes);
 
-                if (!Directory.Exists(folder)) continue;
+                string driveRoot = Path.GetPathRoot(folder) ?? @"C:\";
+                string relativePath = folder.StartsWith(driveRoot, StringComparison.OrdinalIgnoreCase)
+                    ? folder.Substring(driveRoot.Length)
+                    : Path.GetFileName(folder);
 
-                string relativePath = folder.Length >= 3 ? folder.Substring(3) : Path.GetFileName(folder);
                 string targetPath = Path.Combine(cDriveDir, relativePath);
 
                 await CopyDirectoryRobocopyAsync(folder, targetPath, cancellationToken);
@@ -204,7 +206,7 @@ namespace ProfileShift.Core
                 try
                 {
                     Directory.CreateDirectory(targetDir);
-                    string args = $"\"{sourceDir}\" \"{targetDir}\" /E /COPY:DAT /DCOPY:DAT /R:1 /W:2 /MT:16 /XD \"OneDrive*\" \"SharePoint*\" \"Dropbox*\" /NFL /NDL /NJH /NJS /nc /ns /np";
+                    string args = $"\"{sourceDir}\" \"{targetDir}\" /E /COPY:DAT /DCOPY:DAT /R:1 /W:2 /MT:16 /XD \"OneDrive*\" \"SharePoint*\" \"Dropbox*\" \"node_modules\" \".git\" \"Cache\" \"GPUCache\" \"Crashpad\" /XF *.tmp *.bak *.iso *.vhd *.vhdx *.sys *.dmp desktop.ini Thumbs.db /NFL /NDL /NJH /NJS /nc /ns /np";
                     var psi = new ProcessStartInfo
                     {
                         FileName = "robocopy",

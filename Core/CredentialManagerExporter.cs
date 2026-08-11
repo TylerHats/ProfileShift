@@ -239,7 +239,7 @@ namespace ProfileShift.Core
                     UserName = exportedCred.UserName,
                     CredentialBlobSize = (uint)passwordBytes.Length,
                     CredentialBlob = passwordPtr,
-                    Persist = (uint)exportedCred.Persistence,
+                    Persist = exportedCred.Persistence > 0 ? (uint)exportedCred.Persistence : (uint)CRED_PERSIST_LOCAL_MACHINE,
                     Comment = "Restored by ProfileShift",
                     AttributeCount = 0,
                     Attributes = IntPtr.Zero,
