@@ -56,7 +56,7 @@ namespace ProfileShift.Core
         /// Chromium browser profiles. Saves results as a DPAPI-encrypted JSON file.
         /// Requires the browser processes to be closed.
         /// </summary>
-        public static int ExportPasswordsNative(string userProfilePath, string backupDir, Action<string>? log = null)
+        public static int ExportPasswordsNative(string userProfilePath, string backupDir, string passphrase, Action<string>? log = null)
         {
             var allPasswords = new List<BrowserPasswordEntry>();
 
@@ -115,11 +115,10 @@ namespace ProfileShift.Core
                 return 0;
             }
 
-            // Serialize and DPAPI-encrypt
+            // Serialize and encrypt with passphrase
             string json = JsonSerializer.Serialize(allPasswords, new JsonSerializerOptions { WriteIndented = true });
             byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
-            byte[] encrypted = ProtectedData.Protect(jsonBytes, null, DataProtectionScope.CurrentUser);
-            File.WriteAllBytes(Path.Combine(backupDir, "BrowserPasswords.dat"), encrypted);
+            PortableEncryption.EncryptToFile(jsonBytes, passphrase, Path.Combine(backupDir, "BrowserPasswords.dat"));
 
             log?.Invoke($"Browser Passwords: Exported {allPasswords.Count} total passwords (encrypted).");
             return allPasswords.Count;
@@ -393,9 +392,9 @@ namespace ProfileShift.Core
 
         /// <summary>
         /// After browser-assisted export, scans common locations for exported CSV files
-        /// and moves them into the backup directory with DPAPI encryption.
+        /// and moves them into the backup directory with passphrase encryption.
         /// </summary>
-        public static int CollectAssistedExportCSVs(string backupDir, Action<string>? log = null)
+        public static int CollectAssistedExportCSVs(string backupDir, string passphrase, Action<string>? log = null)
         {
             string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             string[] searchDirs = new[]
@@ -444,7 +443,7 @@ namespace ProfileShift.Core
                 return 0;
             }
 
-            // Read all CSVs, DPAPI-encrypt them as a combined file
+            // Read all CSVs, encrypt with passphrase
             var allEntries = new List<BrowserPasswordEntry>();
             foreach (var csvPath in collected)
             {
@@ -482,8 +481,7 @@ namespace ProfileShift.Core
             {
                 string json = JsonSerializer.Serialize(allEntries, new JsonSerializerOptions { WriteIndented = true });
                 byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
-                byte[] encrypted = ProtectedData.Protect(jsonBytes, null, DataProtectionScope.CurrentUser);
-                File.WriteAllBytes(Path.Combine(backupDir, "BrowserPasswords.dat"), encrypted);
+                PortableEncryption.EncryptToFile(jsonBytes, passphrase, Path.Combine(backupDir, "BrowserPasswords.dat"));
 
                 log?.Invoke($"Browser Passwords: Collected {allEntries.Count} passwords from {collected.Count} CSV file(s).");
             }
@@ -497,7 +495,7 @@ namespace ProfileShift.Core
         /// For restore: writes per-browser CSV files from the encrypted export
         /// and opens each browser to its password import page.
         /// </summary>
-        public static void ImportBrowserPasswords(string stagingDir, Action<string>? log = null)
+        public static void ImportBrowserPasswords(string stagingDir, string passphrase, Action<string>? log = null)
         {
             string importPath = Path.Combine(stagingDir, "BrowserPasswords.dat");
             if (!File.Exists(importPath))
@@ -508,8 +506,7 @@ namespace ProfileShift.Core
 
             try
             {
-                byte[] encrypted = File.ReadAllBytes(importPath);
-                byte[] jsonBytes = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
+                byte[] jsonBytes = PortableEncryption.DecryptFromFile(importPath, passphrase);
                 string json = Encoding.UTF8.GetString(jsonBytes);
 
                 var allEntries = JsonSerializer.Deserialize<List<BrowserPasswordEntry>>(json);
@@ -571,7 +568,7 @@ namespace ProfileShift.Core
             }
             catch (CryptographicException)
             {
-                log?.Invoke("Browser Passwords: Cannot decrypt export file — different user context or machine. Skipping.");
+                log?.Invoke("Browser Passwords: Incorrect passphrase — cannot decrypt export file. Skipping.");
             }
             catch (Exception ex)
             {

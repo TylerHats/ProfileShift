@@ -102,7 +102,7 @@
                         <!-- Password Export Warning Banner -->
                         <Border x:Name="PasswordWarningBanner" Background="#33FFA500" CornerRadius="4" Padding="8" Margin="0,4,0,4" Visibility="Collapsed">
                             <TextBlock TextWrapping="Wrap" Foreground="#FFD580" FontSize="11.5">
-                                ⚠️ Exported passwords are stored as a DPAPI-encrypted file in your backup folder — only readable by the current Windows user on this machine. The file is deleted from the target after restore. Ensure your backup destination is secure.
+                                ⚠️ You will be prompted to set a passphrase to encrypt exported credentials. You'll need this same passphrase when restoring on the target machine. Ensure your backup destination is secure.
                             </TextBlock>
                         </Border>
 

@@ -348,12 +348,32 @@ namespace ProfileShift.UI
             }
 
             bool exportCredentialManager = ChkCredentialManager?.IsChecked == true;
+            bool needsPassphrase = exportCredentialManager || exportBrowserPasswords;
+            string credentialPassphrase = string.Empty;
+
+            if (needsPassphrase)
+            {
+                // Prompt for a passphrase to encrypt the credential exports
+                credentialPassphrase = PromptForPassphrase(
+                    "Set Credential Export Passphrase",
+                    "Enter a passphrase to encrypt your exported credentials.\n" +
+                    "You will need this same passphrase when restoring on the target machine.\n\n" +
+                    "This protects your passwords in the backup folder.");
+
+                if (string.IsNullOrEmpty(credentialPassphrase))
+                {
+                    Log("Credential export cancelled — no passphrase provided.");
+                    exportCredentialManager = false;
+                    exportBrowserPasswords = false;
+                }
+            }
 
             bool success = await _backupEngine.RunBackupAsync(
                 dest, selectedUsers, rootFolders, userFoldersMap, userBrowsersMap, _cts.Token,
                 exportCredentialManager: exportCredentialManager,
                 exportBrowserPasswords: exportBrowserPasswords,
-                browserPasswordMode: browserPasswordMode);
+                browserPasswordMode: browserPasswordMode,
+                credentialPassphrase: credentialPassphrase);
 
             // If browser-assisted mode, collect the CSVs after backup
             if (success && exportBrowserPasswords && browserPasswordMode == "browser-assisted")
@@ -366,7 +386,7 @@ namespace ProfileShift.UI
                 if (latestBackup != null)
                 {
                     Log("Collecting exported browser password CSVs...");
-                    BrowserPasswordExporter.CollectAssistedExportCSVs(latestBackup, msg => Log(msg));
+                    BrowserPasswordExporter.CollectAssistedExportCSVs(latestBackup, credentialPassphrase, msg => Log(msg));
                 }
             }
 
@@ -446,6 +466,87 @@ namespace ProfileShift.UI
                 TxtLog.AppendText($"[{timestamp}] {message}\n");
                 TxtLog.ScrollToEnd();
             });
+        }
+
+        /// <summary>
+        /// Shows a passphrase input dialog. Returns the entered passphrase,
+        /// or empty string if cancelled.
+        /// </summary>
+        private string PromptForPassphrase(string title, string message)
+        {
+            var dialog = new Window
+            {
+                Title = title,
+                Width = 420,
+                Height = 230,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize,
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2F3136")),
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D9D9D9")),
+                FontFamily = new FontFamily("Segoe UI"),
+                FontSize = 13
+            };
+
+            var stack = new StackPanel { Margin = new Thickness(16) };
+
+            var msgBlock = new TextBlock
+            {
+                Text = message,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D9D9D9")),
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+            stack.Children.Add(msgBlock);
+
+            var pwBox = new PasswordBox
+            {
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#40444B")),
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D9D9D9")),
+                BorderBrush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#202225")),
+                Padding = new Thickness(6),
+                FontSize = 14,
+                Height = 32,
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+            stack.Children.Add(pwBox);
+
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+
+            var btnOk = new Button
+            {
+                Content = "OK",
+                Width = 80,
+                Height = 30,
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7289DA")),
+                Foreground = Brushes.White,
+                Margin = new Thickness(0, 0, 8, 0),
+                IsDefault = true
+            };
+            btnOk.Click += (s, ev) => { dialog.DialogResult = true; dialog.Close(); };
+            btnPanel.Children.Add(btnOk);
+
+            var btnCancel = new Button
+            {
+                Content = "Cancel",
+                Width = 80,
+                Height = 30,
+                Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#40444B")),
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D9D9D9")),
+                IsCancel = true
+            };
+            btnPanel.Children.Add(btnCancel);
+
+            stack.Children.Add(btnPanel);
+            dialog.Content = stack;
+
+            Utilities.DwmHelper.EnableDarkModeTitleBar(dialog);
+
+            if (dialog.ShowDialog() == true && !string.IsNullOrEmpty(pwBox.Password))
+            {
+                return pwBox.Password;
+            }
+            return string.Empty;
         }
     }
 }

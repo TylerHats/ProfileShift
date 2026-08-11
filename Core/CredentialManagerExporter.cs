@@ -72,9 +72,9 @@ namespace ProfileShift.Core
 
         /// <summary>
         /// Exports all relevant Credential Manager entries for the current user
-        /// to a DPAPI-encrypted JSON file in the backup directory.
+        /// to a passphrase-encrypted JSON file in the backup directory.
         /// </summary>
-        public static int ExportCredentials(string backupDir, Action<string>? log = null)
+        public static int ExportCredentials(string backupDir, string passphrase, Action<string>? log = null)
         {
             string exportPath = Path.Combine(backupDir, "CredentialManager.dat");
             var credentials = new List<ExportedCredential>();
@@ -151,12 +151,10 @@ namespace ProfileShift.Core
                     return 0;
                 }
 
-                // Serialize to JSON, then DPAPI-encrypt
+                // Serialize to JSON, then encrypt with passphrase
                 string json = JsonSerializer.Serialize(credentials, new JsonSerializerOptions { WriteIndented = true });
                 byte[] jsonBytes = Encoding.UTF8.GetBytes(json);
-                byte[] encrypted = ProtectedData.Protect(jsonBytes, null, DataProtectionScope.CurrentUser);
-
-                File.WriteAllBytes(exportPath, encrypted);
+                PortableEncryption.EncryptToFile(jsonBytes, passphrase, exportPath);
 
                 log?.Invoke($"Credential Manager: Exported {credentials.Count} credentials ({rdpCount} RDP, {driveCount} network, {genericCount} generic).");
                 return credentials.Count;
@@ -168,10 +166,10 @@ namespace ProfileShift.Core
         }
 
         /// <summary>
-        /// Imports credentials from a DPAPI-encrypted export file back into
+        /// Imports credentials from a passphrase-encrypted export file back into
         /// the current user's Credential Manager via CredWriteW.
         /// </summary>
-        public static int ImportCredentials(string stagingDir, Action<string>? log = null)
+        public static int ImportCredentials(string stagingDir, string passphrase, Action<string>? log = null)
         {
             string importPath = Path.Combine(stagingDir, "CredentialManager.dat");
             if (!File.Exists(importPath))
@@ -182,8 +180,7 @@ namespace ProfileShift.Core
 
             try
             {
-                byte[] encrypted = File.ReadAllBytes(importPath);
-                byte[] jsonBytes = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
+                byte[] jsonBytes = PortableEncryption.DecryptFromFile(importPath, passphrase);
                 string json = Encoding.UTF8.GetString(jsonBytes);
 
                 var credentials = JsonSerializer.Deserialize<List<ExportedCredential>>(json);
@@ -215,7 +212,7 @@ namespace ProfileShift.Core
             }
             catch (CryptographicException)
             {
-                log?.Invoke("Credential Manager: Cannot decrypt credential file — different user context or machine. Skipping.");
+                log?.Invoke("Credential Manager: Incorrect passphrase — cannot decrypt credential file. Skipping.");
                 return 0;
             }
             catch (Exception ex)

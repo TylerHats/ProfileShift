@@ -35,7 +35,8 @@ namespace ProfileShift.Core
             string configFormat = "json",
             bool exportCredentialManager = false,
             bool exportBrowserPasswords = false,
-            string browserPasswordMode = "native")
+            string browserPasswordMode = "native",
+            string credentialPassphrase = "")
         {
             string timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string backupDir = Path.Combine(destinationFolder, $"ProfileShift_Backup_{timeStamp}");
@@ -99,7 +100,7 @@ namespace ProfileShift.Core
             {
                 OnLog("Exporting Windows Credential Manager entries...");
                 OnProgress("Exporting Credential Manager...", 2, 0, 0);
-                int credCount = CredentialManagerExporter.ExportCredentials(backupDir, msg => OnLog(msg));
+                int credCount = CredentialManagerExporter.ExportCredentials(backupDir, credentialPassphrase, msg => OnLog(msg));
 
                 // Mark in config for each selected user (current user only)
                 string currentUser = Environment.UserName;
@@ -119,7 +120,7 @@ namespace ProfileShift.Core
                 {
                     OnLog("Exporting browser passwords (native mode)...");
                     OnProgress("Exporting browser passwords...", 4, 0, 0);
-                    int pwCount = BrowserPasswordExporter.ExportPasswordsNative(currentUserProfile, backupDir, msg => OnLog(msg));
+                    int pwCount = BrowserPasswordExporter.ExportPasswordsNative(currentUserProfile, backupDir, credentialPassphrase, msg => OnLog(msg));
 
                     if (config.UserSelections.ContainsKey(currentUser))
                     {
