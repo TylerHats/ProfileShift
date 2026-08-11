@@ -21,6 +21,7 @@ namespace ProfileShift.UI
         private RestoreEngine _restoreEngine = new RestoreEngine();
 
         private CancellationTokenSource? _estimateCts;
+        private bool _isAlreadyElevated;
 
         public MainWindow()
         {
@@ -50,6 +51,10 @@ namespace ProfileShift.UI
             DwmHelper.EnableDarkModeTitleBar(this);
             LoadUserProfiles();
             await UpdateLiveEstimateAsync();
+
+            // Check elevation state on startup
+            _isAlreadyElevated = ElevatedHelper.IsAlreadyElevated();
+            UpdateUacShieldVisibility();
 
             var updateInfo = await UpdateChecker.CheckForUpdatesAsync();
             if (updateInfo != null && updateInfo.IsNewer)
@@ -156,6 +161,23 @@ namespace ProfileShift.UI
                     if (config != null)
                     {
                         LstRestoreUsers.ItemsSource = config.SelectedUsers;
+
+                        // Show credential info if available
+                        var credInfo = new List<string>();
+                        if (File.Exists(Path.Combine(path, "CredentialManager.dat")))
+                            credInfo.Add("✓ Credential Manager data");
+                        if (File.Exists(Path.Combine(path, "BrowserPasswords.dat")))
+                            credInfo.Add("✓ Browser passwords");
+
+                        if (credInfo.Count > 0)
+                        {
+                            LblRestoreCredentialInfo.Text = "This backup includes: " + string.Join(", ", credInfo);
+                            LblRestoreCredentialInfo.Visibility = Visibility.Visible;
+                        }
+                        else
+                        {
+                            LblRestoreCredentialInfo.Visibility = Visibility.Collapsed;
+                        }
                     }
                 }
             }
@@ -187,6 +209,48 @@ namespace ProfileShift.UI
             }
         }
 
+        // --- UAC Shield Logic ---
+
+        private void ElevationOption_Changed(object sender, RoutedEventArgs e)
+        {
+            UpdateUacShieldVisibility();
+        }
+
+        private void CredentialOption_Changed(object sender, RoutedEventArgs e)
+        {
+            UpdateUacShieldVisibility();
+
+            // Show/hide password warning banner
+            if (PasswordWarningBanner != null)
+            {
+                bool showWarning = ChkBrowserPasswords?.IsChecked == true || ChkCredentialManager?.IsChecked == true;
+                PasswordWarningBanner.Visibility = showWarning ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private void UpdateUacShieldVisibility()
+        {
+            if (UacShieldBackup == null || UacShieldRestore == null) return;
+
+            if (_isAlreadyElevated)
+            {
+                // Already running elevated — no shield needed on either button
+                UacShieldBackup.Visibility = Visibility.Collapsed;
+                UacShieldRestore.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            // Backup: shield needed if any admin-requiring option is checked
+            // (Settings/DISM, WiFi profiles are always exported, so Settings checkbox controls this)
+            bool backupNeedsAdmin = ChkSettings?.IsChecked == true;
+            UacShieldBackup.Visibility = backupNeedsAdmin ? Visibility.Visible : Visibility.Collapsed;
+
+            // Restore: always needs admin (staging folder, schtasks, icacls)
+            UacShieldRestore.Visibility = Visibility.Visible;
+        }
+
+        // --- Backup ---
+
         private async void BtnStartBackup_Click(object sender, RoutedEventArgs e)
         {
             string dest = TxtBackupPath.Text;
@@ -201,6 +265,64 @@ namespace ProfileShift.UI
             {
                 MessageBox.Show("Please select at least one user profile.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
+            }
+
+            // Determine browser password export mode if enabled
+            string browserPasswordMode = "native";
+            bool exportBrowserPasswords = ChkBrowserPasswords?.IsChecked == true;
+
+            if (exportBrowserPasswords)
+            {
+                var modeResult = MessageBox.Show(
+                    "How would you like to export browser passwords?\n\n" +
+                    "YES — Automated (Native)\n" +
+                    "Reads browser password databases directly. Faster and fully automated, " +
+                    "but may trigger behavior-based antivirus alerts on some endpoint protection systems.\n\n" +
+                    "NO — Browser-Assisted (Manual)\n" +
+                    "Opens each browser to its password manager page so you can export manually. " +
+                    "Zero antivirus risk, but requires you to click Export in each browser profile.\n\n" +
+                    "CANCEL — Skip browser password export",
+                    "Browser Password Export Mode",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Question);
+
+                if (modeResult == MessageBoxResult.Cancel)
+                {
+                    exportBrowserPasswords = false;
+                }
+                else if (modeResult == MessageBoxResult.No)
+                {
+                    browserPasswordMode = "browser-assisted";
+                }
+                // Yes = "native" (default)
+            }
+
+            // If browser-assisted mode, launch browsers first and wait for user
+            if (exportBrowserPasswords && browserPasswordMode == "browser-assisted")
+            {
+                string currentUserProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                var browserProfiles = BrowserPasswordExporter.GetBrowserProfilesForAssistedExport(currentUserProfile);
+
+                if (browserProfiles.Count > 0)
+                {
+                    foreach (var (browser, profile, exePath) in browserProfiles)
+                    {
+                        Log($"Opening {browser} ({profile}) to password manager page...");
+                        BrowserPasswordExporter.OpenBrowserPasswordPage(browser, profile, exePath);
+                    }
+
+                    MessageBox.Show(
+                        $"ProfileShift has opened {browserProfiles.Count} browser profile(s) to their password manager pages.\n\n" +
+                        "For each browser:\n" +
+                        "1. Click the ⋮ (three dots) menu near \"Saved Passwords\"\n" +
+                        "2. Click \"Export passwords\"\n" +
+                        "3. Confirm with your Windows PIN/password\n" +
+                        "4. Save the CSV to your Downloads folder\n\n" +
+                        "Click OK when you have finished exporting from all browsers.",
+                        "Export Browser Passwords",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
             }
 
             BtnStartBackup.IsEnabled = false;
@@ -225,7 +347,28 @@ namespace ProfileShift.UI
                 }
             }
 
-            bool success = await _backupEngine.RunBackupAsync(dest, selectedUsers, rootFolders, userFoldersMap, userBrowsersMap, _cts.Token);
+            bool exportCredentialManager = ChkCredentialManager?.IsChecked == true;
+
+            bool success = await _backupEngine.RunBackupAsync(
+                dest, selectedUsers, rootFolders, userFoldersMap, userBrowsersMap, _cts.Token,
+                exportCredentialManager: exportCredentialManager,
+                exportBrowserPasswords: exportBrowserPasswords,
+                browserPasswordMode: browserPasswordMode);
+
+            // If browser-assisted mode, collect the CSVs after backup
+            if (success && exportBrowserPasswords && browserPasswordMode == "browser-assisted")
+            {
+                // Find the backup directory that was just created
+                var latestBackup = Directory.GetDirectories(dest, "ProfileShift_Backup_*")
+                    .OrderByDescending(d => d)
+                    .FirstOrDefault();
+
+                if (latestBackup != null)
+                {
+                    Log("Collecting exported browser password CSVs...");
+                    BrowserPasswordExporter.CollectAssistedExportCSVs(latestBackup, msg => Log(msg));
+                }
+            }
 
             BtnStartBackup.IsEnabled = true;
             BtnCancelBackup.IsEnabled = false;
@@ -241,6 +384,8 @@ namespace ProfileShift.UI
             _cts?.Cancel();
             Log("Cancelling operation...");
         }
+
+        // --- Restore ---
 
         private async void BtnStartRestore_Click(object sender, RoutedEventArgs e)
         {
@@ -258,6 +403,19 @@ namespace ProfileShift.UI
                 return;
             }
 
+            // Restore always requires elevation for staging folder + schtasks
+            if (!_isAlreadyElevated)
+            {
+                string usersArg = string.Join("|", selectedUsers);
+                bool elevated = ElevatedHelper.RunElevatedRestoreTasks(src, usersArg, msg => Log(msg));
+
+                if (!elevated)
+                {
+                    MessageBox.Show("Restore requires administrator privileges. Please approve the UAC prompt.", "Elevation Required", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
             BtnStartRestore.IsEnabled = false;
             bool success = await _restoreEngine.StageRestoreAsync(src, selectedUsers);
             BtnStartRestore.IsEnabled = true;
@@ -267,6 +425,8 @@ namespace ProfileShift.UI
                 MessageBox.Show("Profile staging completed successfully! Log off and log in as the migrated user to finalize profile setup.", "Staging Ready", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
+
+        // --- Logs ---
 
         private void BtnViewLogs_Click(object sender, RoutedEventArgs e)
         {

@@ -44,6 +44,21 @@ namespace ProfileShift.Core
                     WifiProfileMigrator.RestoreWifiProfiles(wifiDst);
                 }
 
+                // --- Stage credential export files ---
+                string credManagerFile = Path.Combine(backupSourcePath, "CredentialManager.dat");
+                if (File.Exists(credManagerFile))
+                {
+                    File.Copy(credManagerFile, Path.Combine(publicStaging, "CredentialManager.dat"), true);
+                    OnLog("Credential Manager export file staged for restore.");
+                }
+
+                string browserPwFile = Path.Combine(backupSourcePath, "BrowserPasswords.dat");
+                if (File.Exists(browserPwFile))
+                {
+                    File.Copy(browserPwFile, Path.Combine(publicStaging, "BrowserPasswords.dat"), true);
+                    OnLog("Browser passwords export file staged for restore.");
+                }
+
                 string filesStaging = Path.Combine(publicStaging, "StagedFiles");
                 Directory.CreateDirectory(filesStaging);
 

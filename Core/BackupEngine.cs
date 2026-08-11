@@ -32,7 +32,10 @@ namespace ProfileShift.Core
             Dictionary<string, List<string>> userFoldersMap,
             Dictionary<string, List<string>> userBrowsersMap,
             CancellationToken cancellationToken,
-            string configFormat = "json")
+            string configFormat = "json",
+            bool exportCredentialManager = false,
+            bool exportBrowserPasswords = false,
+            string browserPasswordMode = "native")
         {
             string timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string backupDir = Path.Combine(destinationFolder, $"ProfileShift_Backup_{timeStamp}");
@@ -91,6 +94,58 @@ namespace ProfileShift.Core
             config.Printers = SettingsMigrator.ExtractPrintersDeduplicated();
             config.SystemSoftware = SettingsMigrator.ExtractInstalledSoftware();
 
+            // --- Credential Manager Export (runs in current user context, no elevation) ---
+            if (exportCredentialManager)
+            {
+                OnLog("Exporting Windows Credential Manager entries...");
+                OnProgress("Exporting Credential Manager...", 2, 0, 0);
+                int credCount = CredentialManagerExporter.ExportCredentials(backupDir, msg => OnLog(msg));
+
+                // Mark in config for each selected user (current user only)
+                string currentUser = Environment.UserName;
+                if (config.UserSelections.ContainsKey(currentUser))
+                {
+                    config.UserSelections[currentUser].CredentialManagerExported = credCount > 0;
+                }
+            }
+
+            // --- Browser Password Export (runs in current user context, no elevation) ---
+            if (exportBrowserPasswords)
+            {
+                string currentUserProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                string currentUser = Environment.UserName;
+
+                if (browserPasswordMode == "native")
+                {
+                    OnLog("Exporting browser passwords (native mode)...");
+                    OnProgress("Exporting browser passwords...", 4, 0, 0);
+                    int pwCount = BrowserPasswordExporter.ExportPasswordsNative(currentUserProfile, backupDir, msg => OnLog(msg));
+
+                    if (config.UserSelections.ContainsKey(currentUser))
+                    {
+                        config.UserSelections[currentUser].BrowserPasswordsExported = pwCount > 0;
+                        config.UserSelections[currentUser].BrowserPasswordExportMode = "native";
+                    }
+                }
+                else if (browserPasswordMode == "browser-assisted")
+                {
+                    // Browser-assisted mode: CSVs are collected separately after the user exports them
+                    // The caller (MainWindow) handles the interactive flow and calls CollectAssistedExportCSVs
+                    OnLog("Browser-assisted password export: CSVs will be collected after manual export.");
+                    if (config.UserSelections.ContainsKey(currentUser))
+                    {
+                        config.UserSelections[currentUser].BrowserPasswordExportMode = "browser-assisted";
+                    }
+                }
+            }
+
+            // --- Admin-requiring tasks: DISM app associations + WiFi profiles ---
+            // These are delegated to an elevated helper process if we're not already elevated
+            OnLog("Running system-level exports (may require administrator privileges)...");
+            OnProgress("Running elevated system exports...", 6, 0, 0);
+            ElevatedHelper.RunElevatedBackupTasks(backupDir, msg => OnLog(msg));
+
+            // --- Calculate total backup size ---
             OnLog("Calculating backup total size...");
             long totalBytes = FolderScanner.CalculateTotalSize(foldersToCopy);
             OnLog($"Total estimated backup size: {Math.Round(totalBytes / 1073741824.0, 2)} GB");
@@ -103,14 +158,7 @@ namespace ProfileShift.Core
                 return false;
             }
 
-            string appAssocXml = Path.Combine(backupDir, "AppAssoc.xml");
-            SettingsMigrator.ExportDefaultAppAssociations(appAssocXml);
-            OnLog("Default Application Associations exported.");
-
-            string wifiFolder = Path.Combine(backupDir, "WiFi_Profiles");
-            WifiProfileMigrator.ExportWifiProfiles(wifiFolder);
-            OnLog("Wi-Fi Network SSID Profiles exported.");
-
+            // --- Save config files ---
             string jsonConfigPath = Path.Combine(backupDir, "Migration.json");
             ConfigManager.SaveConfigJson(config, jsonConfigPath);
 
@@ -119,6 +167,7 @@ namespace ProfileShift.Core
 
             OnLog("Config files Migration.json & Migration.yaml saved.");
 
+            // --- File copy phase ---
             long copiedBytes = 0;
             int count = 0;
 
@@ -131,7 +180,7 @@ namespace ProfileShift.Core
                 }
 
                 count++;
-                int percent = (int)((double)count / foldersToCopy.Count * 100);
+                int percent = 10 + (int)((double)count / foldersToCopy.Count * 90);
                 OnProgress($"Copying ({count}/{foldersToCopy.Count}): {Path.GetFileName(folder)}", percent, copiedBytes, totalBytes);
 
                 if (!Directory.Exists(folder)) continue;

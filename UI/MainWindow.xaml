@@ -87,9 +87,25 @@
                         <CheckBox x:Name="ChkRootData" Content="Include Non-Standard C:\ Root Folders" IsChecked="True"/>
                         <CheckBox x:Name="ChkUserProfiles" Content="User Profile Directories (Desktop, Docs, Downloads)" IsChecked="True"/>
                         <CheckBox x:Name="ChkBrowsers" Content="Browser Profiles (Chrome, Edge, Firefox, Opera, Brave)" IsChecked="True"/>
-                        <CheckBox x:Name="ChkSettings" Content="OS Settings, Wallpaper, Taskbar &amp; Printers" IsChecked="True"/>
+                        <CheckBox x:Name="ChkSettings" Content="OS Settings, Wallpaper, Taskbar &amp; Printers" IsChecked="True"
+                                  Checked="ElevationOption_Changed" Unchecked="ElevationOption_Changed"/>
                         <CheckBox x:Name="ChkSoftware" Content="Generate Software Inventory Report" IsChecked="True"/>
                         <CheckBox x:Name="ChkIntegrity" Content="Perform File Integrity Verification" IsChecked="True"/>
+
+                        <!-- Credential Migration Options -->
+                        <TextBlock Text="Credential Migration:" Foreground="#D9D9D9" FontWeight="Bold" Margin="0,10,0,5"/>
+                        <CheckBox x:Name="ChkCredentialManager" Content="Credential Manager (RDP, Drives, VPN Passwords)" IsChecked="False"
+                                  Checked="CredentialOption_Changed" Unchecked="CredentialOption_Changed"/>
+                        <CheckBox x:Name="ChkBrowserPasswords" Content="Browser Saved Passwords (Chrome, Edge, Brave, Vivaldi)" IsChecked="False"
+                                  Checked="CredentialOption_Changed" Unchecked="CredentialOption_Changed"/>
+
+                        <!-- Password Export Warning Banner -->
+                        <Border x:Name="PasswordWarningBanner" Background="#33FFA500" CornerRadius="4" Padding="8" Margin="0,4,0,4" Visibility="Collapsed">
+                            <TextBlock TextWrapping="Wrap" Foreground="#FFD580" FontSize="11.5">
+                                ⚠️ Exported passwords are stored as a DPAPI-encrypted file in your backup folder — only readable by the current Windows user on this machine. The file is deleted from the target after restore. Ensure your backup destination is secure.
+                            </TextBlock>
+                        </Border>
+
                         <Button x:Name="BtnCustomizeFolders" Content="Customize Subfolders (Tree View)..." Height="28" Margin="0,6,0,6" Background="#40444B" Click="BtnCustomizeFolders_Click"/>
 
                         <TextBlock x:Name="LblLiveEstimate" Text="Selected: Calculating..." Foreground="#43B581" FontWeight="SemiBold" Margin="0,6,0,4"/>
@@ -99,7 +115,12 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <Button x:Name="BtnStartBackup" Grid.Column="0" Content="Start Backup" Height="36" Background="#7289DA" Foreground="White" FontWeight="Bold" Click="BtnStartBackup_Click"/>
+                            <Button x:Name="BtnStartBackup" Grid.Column="0" Height="36" Background="#7289DA" Foreground="White" Click="BtnStartBackup_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="UacShieldBackup" Text="🛡️ " FontSize="14" Visibility="Collapsed" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Start Backup" FontWeight="Bold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
                             <Button x:Name="BtnCancelBackup" Grid.Column="1" Content="Cancel" Width="80" Height="36" Background="#B33232" Foreground="White" IsEnabled="False" Margin="6,0,0,0" Click="BtnCancelBackup_Click"/>
                         </Grid>
                     </StackPanel>
@@ -120,7 +141,7 @@
                     </Grid>
 
                     <TextBlock Text="Users Available in Backup:" Foreground="#D9D9D9" Margin="0,0,0,4"/>
-                    <Border Background="#40444B" CornerRadius="4" Padding="6" Height="140" Margin="0,0,0,15">
+                    <Border Background="#40444B" CornerRadius="4" Padding="6" Height="100" Margin="0,0,0,10">
                         <ListBox x:Name="LstRestoreUsers" Background="Transparent" BorderThickness="0">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
@@ -130,7 +151,16 @@
                         </ListBox>
                     </Border>
 
-                    <Button x:Name="BtnStartRestore" Content="Stage Migration Data" Height="40" Background="#7289DA" Foreground="White" FontWeight="Bold" Click="BtnStartRestore_Click"/>
+                    <!-- Restore credential info -->
+                    <TextBlock x:Name="LblRestoreCredentialInfo" Text="" Foreground="#43B581" FontWeight="SemiBold" 
+                               TextWrapping="Wrap" Margin="0,0,0,10" Visibility="Collapsed"/>
+
+                    <Button x:Name="BtnStartRestore" Height="40" Background="#7289DA" Foreground="White" Click="BtnStartRestore_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="UacShieldRestore" Text="🛡️ " FontSize="14" VerticalAlignment="Center"/>
+                            <TextBlock Text="Stage Migration Data" FontWeight="Bold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Border>
         </Grid>

@@ -29,6 +29,9 @@ namespace ProfileShift.Models
         public List<string> Browsers { get; set; } = new List<string>();
         public UserSettings Settings { get; set; } = new UserSettings();
         public Dictionary<string, string> EnvironmentVariables { get; set; } = new Dictionary<string, string>();
+        public bool CredentialManagerExported { get; set; }
+        public bool BrowserPasswordsExported { get; set; }
+        public string BrowserPasswordExportMode { get; set; } = string.Empty;
     }
 
     public class UserSettings
@@ -63,5 +66,23 @@ namespace ProfileShift.Models
         public string Name { get; set; } = string.Empty;
         public string RelativePath { get; set; } = string.Empty;
         public bool IsInstalled { get; set; }
+    }
+
+    public class ExportedCredential
+    {
+        public string TargetName { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public int CredentialType { get; set; }
+        public int Persistence { get; set; }
+    }
+
+    public class BrowserPasswordEntry
+    {
+        public string Browser { get; set; } = string.Empty;
+        public string ProfileName { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+        public string Username { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 }

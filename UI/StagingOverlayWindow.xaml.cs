@@ -105,6 +105,34 @@ namespace ProfileShift.UI
                 SettingsMigrator.ImportDefaultAppAssociations(appAssocXml);
             }
 
+            // --- Credential Manager Import ---
+            string credManagerFile = Path.Combine(publicStaging, "CredentialManager.dat");
+            if (File.Exists(credManagerFile))
+            {
+                UpdateStatus("Restoring saved credentials (RDP, network drives, VPN)...");
+                await Task.Run(() =>
+                {
+                    CredentialManagerExporter.ImportCredentials(publicStaging,
+                        msg => Dispatcher.Invoke(() => UpdateStatus(msg)));
+                });
+            }
+
+            // --- Browser Password Import ---
+            string browserPwFile = Path.Combine(publicStaging, "BrowserPasswords.dat");
+            if (File.Exists(browserPwFile))
+            {
+                UpdateStatus("Preparing browser password import...");
+                await Task.Run(() =>
+                {
+                    BrowserPasswordExporter.ImportBrowserPasswords(publicStaging,
+                        msg => Dispatcher.Invoke(() => UpdateStatus(msg)));
+                });
+
+                // Give the user a moment to see the browsers open
+                UpdateStatus("Browser password CSVs ready — import them from the browser's password settings page.");
+                await Task.Delay(5000);
+            }
+
             UpdateStatus("Generating Migration Summary report on Desktop...");
             ReportGenerator.SaveReportToDesktop(config, matchedUser);
 

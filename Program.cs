@@ -26,6 +26,42 @@ namespace ProfileShift
                     return;
                 }
 
+                if (argList.Contains("--elevated-helper"))
+                {
+                    string backupDir = GetArgValue(argList, "--backup-dir");
+                    if (string.IsNullOrEmpty(backupDir))
+                    {
+                        Console.Error.WriteLine("[ELEVATED] Error: --backup-dir required.");
+                        Environment.Exit(1);
+                        return;
+                    }
+                    int exitCode = ElevatedHelper.RunElevatedHelperCli(backupDir);
+                    Environment.Exit(exitCode);
+                    return;
+                }
+
+                if (argList.Contains("--elevated-restore"))
+                {
+                    string srcPath = GetArgValue(argList, "--src");
+                    string usersArg = GetArgValue(argList, "--users");
+
+                    if (string.IsNullOrEmpty(srcPath))
+                    {
+                        Console.Error.WriteLine("[ELEVATED] Error: --src required.");
+                        Environment.Exit(1);
+                        return;
+                    }
+
+                    var users = new List<string>(usersArg.Split('|', StringSplitOptions.RemoveEmptyEntries));
+                    var restoreEngine = new RestoreEngine();
+                    restoreEngine.LogMessage += (s, msg) => Console.WriteLine($"[ELEVATED] {msg}");
+
+                    var task = restoreEngine.StageRestoreAsync(srcPath, users);
+                    task.Wait();
+                    Environment.Exit(task.Result ? 0 : 1);
+                    return;
+                }
+
                 if (argList.Contains("--silent") || argList.Contains("--backup") || argList.Contains("--restore"))
                 {
                     RunCliAsync(argList).Wait();
@@ -74,7 +110,13 @@ namespace ProfileShift
                     userBrowsersMap[u.Username] = available.FindAll(b => b.IsInstalled).ConvertAll(b => b.RelativePath);
                 }
 
-                await engine.RunBackupAsync(destPath, users, rootFolders, userFoldersMap, userBrowsersMap, CancellationToken.None);
+                bool exportCreds = args.Contains("--export-credentials");
+                bool exportBrowserPw = args.Contains("--export-browser-passwords");
+
+                await engine.RunBackupAsync(destPath, users, rootFolders, userFoldersMap, userBrowsersMap, CancellationToken.None,
+                    exportCredentialManager: exportCreds,
+                    exportBrowserPasswords: exportBrowserPw,
+                    browserPasswordMode: "native");
             }
             else if (args.Contains("--restore"))
             {
