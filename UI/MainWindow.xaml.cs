@@ -20,6 +20,11 @@ namespace ProfileShift.UI
         private BackupEngine _backupEngine = new BackupEngine();
         private RestoreEngine _restoreEngine = new RestoreEngine();
 
+        private Dictionary<string, List<string>>? _customUserFolders;
+        private Dictionary<string, List<string>>? _customUserExcludedFolders;
+        private List<string>? _customRootFolders;
+        private List<string>? _customExcludedRootFolders;
+
         private CancellationTokenSource? _estimateCts;
         private bool _isAlreadyElevated;
 
@@ -50,6 +55,30 @@ namespace ProfileShift.UI
         {
             DwmHelper.EnableDarkModeTitleBar(this);
             LoadUserProfiles();
+
+            if (ChkRootData != null)
+            {
+                ChkRootData.Checked += async (s, ev) => await UpdateLiveEstimateAsync();
+                ChkRootData.Unchecked += async (s, ev) => await UpdateLiveEstimateAsync();
+            }
+
+            if (ChkUserProfiles != null)
+            {
+                ChkUserProfiles.Checked += async (s, ev) => await UpdateLiveEstimateAsync();
+                ChkUserProfiles.Unchecked += async (s, ev) => await UpdateLiveEstimateAsync();
+            }
+
+            if (ChkBrowsers != null)
+            {
+                ChkBrowsers.Checked += async (s, ev) => await UpdateLiveEstimateAsync();
+                ChkBrowsers.Unchecked += async (s, ev) => await UpdateLiveEstimateAsync();
+            }
+
+            if (TxtBackupPath != null)
+            {
+                TxtBackupPath.TextChanged += async (s, ev) => await UpdateLiveEstimateAsync();
+            }
+
             await UpdateLiveEstimateAsync();
 
             // Check elevation state on startup
@@ -73,23 +102,56 @@ namespace ProfileShift.UI
 
             var selectedUsers = _userProfiles.Where(u => u.IsSelected).ToList();
             var foldersToScan = new List<string>();
+            var allExclusions = new List<string>();
 
             if (ChkRootData?.IsChecked == true)
             {
-                foldersToScan.AddRange(FolderScanner.GetRootDriveFolders());
+                var roots = _customRootFolders ?? FolderScanner.GetRootDriveFolders(TxtBackupPath?.Text);
+                foldersToScan.AddRange(roots);
+                if (_customExcludedRootFolders != null)
+                {
+                    allExclusions.AddRange(_customExcludedRootFolders);
+                }
             }
 
             foreach (var user in selectedUsers)
             {
                 if (ChkUserProfiles?.IsChecked == true)
                 {
-                    foldersToScan.AddRange(FolderScanner.GetUserSelectableFolders(user.ProfilePath));
+                    var uFolders = _customUserFolders != null && _customUserFolders.TryGetValue(user.Username, out var cf)
+                        ? cf
+                        : FolderScanner.GetUserSelectableFolders(user.ProfilePath);
+                    foldersToScan.AddRange(uFolders);
+
+                    if (_customUserExcludedFolders != null && _customUserExcludedFolders.TryGetValue(user.Username, out var ce))
+                    {
+                        allExclusions.AddRange(ce);
+                    }
                 }
+
+                if (ChkBrowsers?.IsChecked == true)
+                {
+                    var available = BrowserDetector.GetAvailableBrowsers(user.ProfilePath);
+                    foreach (var b in available.Where(b => b.IsInstalled))
+                    {
+                        string fullBPath = Path.Combine(user.ProfilePath, b.RelativePath);
+                        if (Directory.Exists(fullBPath))
+                        {
+                            foldersToScan.Add(fullBPath);
+                        }
+                    }
+                }
+            }
+
+            string destPath = TxtBackupPath?.Text ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(destPath))
+            {
+                allExclusions.Add(destPath);
             }
 
             try
             {
-                var (bytes, count) = await FolderScanner.CalculateTotalStatsAsync(foldersToScan, token);
+                var (bytes, count) = await FolderScanner.CalculateTotalStatsAsync(foldersToScan, allExclusions, token);
                 if (!token.IsCancellationRequested)
                 {
                     double gb = Math.Round(bytes / 1073741824.0, 2);
@@ -105,6 +167,16 @@ namespace ProfileShift.UI
         private void LoadUserProfiles()
         {
             _userProfiles = UserDetection.GetLocalUserProfiles();
+            foreach (var up in _userProfiles)
+            {
+                up.PropertyChanged += async (s, e) =>
+                {
+                    if (e.PropertyName == nameof(UserProfile.IsSelected))
+                    {
+                        await UpdateLiveEstimateAsync();
+                    }
+                };
+            }
             LstUsers.ItemsSource = _userProfiles;
         }
 
@@ -183,29 +255,40 @@ namespace ProfileShift.UI
             }
         }
 
-        private void BtnCustomizeFolders_Click(object sender, RoutedEventArgs e)
+        private async void BtnCustomizeFolders_Click(object sender, RoutedEventArgs e)
         {
             var selectedUsers = _userProfiles.Where(u => u.IsSelected).ToList();
-            var allFolders = new List<string>();
-
-            if (ChkRootData.IsChecked == true)
+            if (selectedUsers.Count == 0)
             {
-                allFolders.AddRange(FolderScanner.GetRootDriveFolders());
+                MessageBox.Show("Please select at least one user profile first.", "No Users Selected", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
             }
 
-            foreach (var user in selectedUsers)
-            {
-                allFolders.AddRange(FolderScanner.GetUserSelectableFolders(user.ProfilePath));
-            }
+            bool includeRoot = ChkRootData.IsChecked == true;
 
-            var modal = new Views.FolderPickerModal(allFolders)
+            var modal = new Views.FolderPickerModal(
+                selectedUsers,
+                includeRoot,
+                _customUserFolders,
+                _customUserExcludedFolders,
+                _customRootFolders,
+                _customExcludedRootFolders)
             {
                 Owner = this
             };
 
             if (modal.ShowDialog() == true)
             {
-                Log($"Custom folder selection updated: {modal.SelectedFolderPaths.Count} subfolders selected.");
+                _customUserFolders = new Dictionary<string, List<string>>(modal.UserFoldersMap);
+                _customUserExcludedFolders = new Dictionary<string, List<string>>(modal.UserExcludedFoldersMap);
+                _customRootFolders = new List<string>(modal.SelectedRootFolders);
+                _customExcludedRootFolders = new List<string>(modal.ExcludedRootFolders);
+
+                int totalIncluded = _customUserFolders.Values.Sum(v => v.Count) + _customRootFolders.Count;
+                int totalExcluded = _customUserExcludedFolders.Values.Sum(v => v.Count) + _customExcludedRootFolders.Count;
+
+                Log($"Custom folder selection updated: {totalIncluded} top-level folders included, {totalExcluded} subfolders excluded.");
+                await UpdateLiveEstimateAsync();
             }
         }
 
@@ -329,7 +412,10 @@ namespace ProfileShift.UI
             BtnCancelBackup.IsEnabled = true;
             _cts = new CancellationTokenSource();
 
-            var rootFolders = ChkRootData.IsChecked == true ? FolderScanner.GetRootDriveFolders() : new List<string>();
+            var rootFolders = ChkRootData.IsChecked == true
+                ? (_customRootFolders ?? FolderScanner.GetRootDriveFolders(dest))
+                : new List<string>();
+
             var userFoldersMap = new Dictionary<string, List<string>>();
             var userBrowsersMap = new Dictionary<string, List<string>>();
 
@@ -337,7 +423,9 @@ namespace ProfileShift.UI
             {
                 if (ChkUserProfiles.IsChecked == true)
                 {
-                    userFoldersMap[user.Username] = FolderScanner.GetUserSelectableFolders(user.ProfilePath);
+                    userFoldersMap[user.Username] = _customUserFolders != null && _customUserFolders.TryGetValue(user.Username, out var uFolders)
+                        ? uFolders
+                        : FolderScanner.GetUserSelectableFolders(user.ProfilePath);
                 }
 
                 if (ChkBrowsers.IsChecked == true)
@@ -373,7 +461,9 @@ namespace ProfileShift.UI
                 exportCredentialManager: exportCredentialManager,
                 exportBrowserPasswords: exportBrowserPasswords,
                 browserPasswordMode: browserPasswordMode,
-                credentialPassphrase: credentialPassphrase);
+                credentialPassphrase: credentialPassphrase,
+                userExcludedFoldersMap: _customUserExcludedFolders,
+                excludedRootFolders: _customExcludedRootFolders);
 
             // If browser-assisted mode, collect the CSVs after backup
             if (success && exportBrowserPasswords && browserPasswordMode == "browser-assisted")

@@ -77,7 +77,7 @@ namespace ProfileShift.UI
                     var psi = new ProcessStartInfo
                     {
                         FileName = "robocopy",
-                        Arguments = $"\"{srcPath}\" \"{userProfile}\" /E /MOVE /IS /IT /MT:16 /NFL /NDL /NJH /NJS /nc /ns /np",
+                        Arguments = $"\"{srcPath}\" \"{userProfile}\" /E /MOVE /XJ /IS /IT /MT:16 /NFL /NDL /NJH /NJS /nc /ns /np",
                         CreateNoWindow = true,
                         UseShellExecute = false
                     };

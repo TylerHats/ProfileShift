@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using ProfileShift.Models;
@@ -36,7 +37,9 @@ namespace ProfileShift.Core
             bool exportCredentialManager = false,
             bool exportBrowserPasswords = false,
             string browserPasswordMode = "native",
-            string credentialPassphrase = "")
+            string credentialPassphrase = "",
+            Dictionary<string, List<string>>? userExcludedFoldersMap = null,
+            List<string>? excludedRootFolders = null)
         {
             string timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string backupDir = Path.Combine(destinationFolder, $"ProfileShift_Backup_{timeStamp}");
@@ -51,10 +54,18 @@ namespace ProfileShift.Core
                 SourceMachineName = Environment.MachineName,
                 SourceDomain = Environment.UserDomainName,
                 MigrationTime = DateTime.Now,
-                SelectedRootFolders = rootFolders
+                SelectedRootFolders = rootFolders,
+                ExcludedRootFolders = excludedRootFolders ?? new List<string>()
             };
 
             var foldersToCopy = new List<string>(rootFolders);
+
+            // Collect all excluded folders across users and root
+            var allExcludedFolders = new List<string>();
+            if (excludedRootFolders != null)
+            {
+                allExcludedFolders.AddRange(excludedRootFolders);
+            }
 
             foreach (var user in selectedUsers)
             {
@@ -73,6 +84,12 @@ namespace ProfileShift.Core
                 {
                     uSelection.Folders = uFolders;
                     foldersToCopy.AddRange(uFolders);
+                }
+
+                if (userExcludedFoldersMap != null && userExcludedFoldersMap.TryGetValue(user.Username, out var uExcluded))
+                {
+                    uSelection.ExcludedFolders = uExcluded;
+                    allExcludedFolders.AddRange(uExcluded);
                 }
 
                 if (userBrowsersMap.TryGetValue(user.Username, out var uBrowsers))
@@ -146,9 +163,9 @@ namespace ProfileShift.Core
             OnProgress("Running elevated system exports...", 6, 0, 0);
             ElevatedHelper.RunElevatedBackupTasks(backupDir, msg => OnLog(msg));
 
-            // --- Calculate total backup size ---
+            // --- Calculate total backup size with exclusions ---
             OnLog("Calculating backup total size...");
-            long totalBytes = FolderScanner.CalculateTotalSize(foldersToCopy);
+            long totalBytes = FolderScanner.CalculateTotalSize(foldersToCopy, allExcludedFolders);
             OnLog($"Total estimated backup size: {Math.Round(totalBytes / 1073741824.0, 2)} GB");
 
             var spaceCheck = PreFlightChecker.CheckDestinationSpace(destinationFolder, totalBytes);
@@ -191,7 +208,7 @@ namespace ProfileShift.Core
 
                 string targetPath = Path.Combine(cDriveDir, relativePath);
 
-                await CopyDirectoryRobocopyAsync(folder, targetPath, cancellationToken);
+                await CopyDirectoryRobocopyAsync(folder, targetPath, destinationFolder, backupDir, allExcludedFolders, cancellationToken);
             }
 
             OnLog("Backup completed successfully!");
@@ -199,14 +216,55 @@ namespace ProfileShift.Core
             return true;
         }
 
-        private Task CopyDirectoryRobocopyAsync(string sourceDir, string targetDir, CancellationToken cancellationToken)
+        private Task CopyDirectoryRobocopyAsync(
+            string sourceDir,
+            string targetDir,
+            string destinationFolder,
+            string backupDir,
+            List<string>? specificExcludedDirs,
+            CancellationToken cancellationToken)
         {
             return Task.Run(() =>
             {
                 try
                 {
                     Directory.CreateDirectory(targetDir);
-                    string args = $"\"{sourceDir}\" \"{targetDir}\" /E /COPY:DAT /DCOPY:DAT /R:1 /W:2 /MT:16 /XD \"OneDrive*\" \"SharePoint*\" \"Dropbox*\" \"node_modules\" \".git\" \"Cache\" \"GPUCache\" \"Crashpad\" /XF *.tmp *.bak *.iso *.vhd *.vhdx *.sys *.dmp desktop.ini Thumbs.db /NFL /NDL /NJH /NJS /nc /ns /np";
+
+                    var xdList = new List<string>
+                    {
+                        "\"OneDrive*\"",
+                        "\"SharePoint*\"",
+                        "\"Dropbox*\"",
+                        "\"node_modules\"",
+                        "\".git\"",
+                        "\"Cache\"",
+                        "\"GPUCache\"",
+                        "\"Crashpad\"",
+                        "\"Code Cache\"",
+                        "\"ProfileShift_Backup*\"",
+                        "\"System_ProfileShift_Staging*\"",
+                        $"\"{backupDir}\""
+                    };
+
+                    if (!string.IsNullOrWhiteSpace(destinationFolder))
+                    {
+                        xdList.Add($"\"{destinationFolder.TrimEnd('\\')}\"");
+                    }
+
+                    if (specificExcludedDirs != null)
+                    {
+                        foreach (var excl in specificExcludedDirs)
+                        {
+                            if (!string.IsNullOrWhiteSpace(excl))
+                            {
+                                xdList.Add($"\"{excl.TrimEnd('\\')}\"");
+                            }
+                        }
+                    }
+
+                    string xdArg = string.Join(" ", xdList.Distinct(StringComparer.OrdinalIgnoreCase));
+                    string args = $"\"{sourceDir}\" \"{targetDir}\" /E /COPY:DAT /DCOPY:DAT /XJ /R:1 /W:2 /MT:16 /XD {xdArg} /XF *.tmp *.bak *.iso *.vhd *.vhdx *.sys *.dmp desktop.ini Thumbs.db /NFL /NDL /NJH /NJS /nc /ns /np";
+
                     var psi = new ProcessStartInfo
                     {
                         FileName = "robocopy",
@@ -244,3 +302,4 @@ namespace ProfileShift.Core
             });
     }
 }
+

@@ -14,7 +14,8 @@ namespace ProfileShift.Core
 
         public static readonly string[] DefaultExcludedDirectories = new[]
         {
-            "node_modules", ".git", "Cache", "GPUCache", "Crashpad", "Code Cache", "temp", "tmp"
+            "node_modules", ".git", "Cache", "GPUCache", "Crashpad", "Code Cache", "temp", "tmp",
+            "ProfileShift_Backup*", "System_ProfileShift_Staging*", "$Windows.~BT", "$Windows.~WS", "$WinREAgent", "Recovery"
         };
 
         public static bool ShouldExcludeFile(string filePath, IEnumerable<string>? customExtensions = null)
@@ -43,13 +44,76 @@ namespace ProfileShift.Core
             if (string.IsNullOrWhiteSpace(dirPath)) return true;
 
             string dirName = Path.GetFileName(dirPath);
-            var dirs = customDirs ?? DefaultExcludedDirectories;
-            if (dirs.Contains(dirName, StringComparer.OrdinalIgnoreCase))
+
+            foreach (var pattern in DefaultExcludedDirectories)
             {
-                return true;
+                if (MatchesPattern(dirName, pattern))
+                {
+                    return true;
+                }
+            }
+
+            if (customDirs != null)
+            {
+                foreach (var custom in customDirs)
+                {
+                    if (string.IsNullOrWhiteSpace(custom)) continue;
+
+                    if (custom.Contains(Path.DirectorySeparatorChar) || custom.Contains(Path.AltDirectorySeparatorChar))
+                    {
+                        if (IsSameOrSubdirectory(custom, dirPath))
+                        {
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        if (MatchesPattern(dirName, custom))
+                        {
+                            return true;
+                        }
+                    }
+                }
             }
 
             return false;
         }
+
+        public static bool IsSameOrSubdirectory(string basePath, string candidatePath)
+        {
+            if (string.IsNullOrWhiteSpace(basePath) || string.IsNullOrWhiteSpace(candidatePath)) return false;
+            try
+            {
+                string normalizedBase = Path.GetFullPath(basePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                string normalizedCandidate = Path.GetFullPath(candidatePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+                if (string.Equals(normalizedBase, normalizedCandidate, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+                return normalizedCandidate.StartsWith(normalizedBase + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool MatchesPattern(string name, string pattern)
+        {
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(pattern)) return false;
+
+            if (pattern.EndsWith("*", StringComparison.Ordinal))
+            {
+                string prefix = pattern.Substring(0, pattern.Length - 1);
+                return name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+            }
+            if (pattern.StartsWith("*", StringComparison.Ordinal))
+            {
+                string suffix = pattern.Substring(1);
+                return name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase);
+            }
+            return string.Equals(name, pattern, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }
+

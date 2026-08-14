@@ -11,7 +11,8 @@ namespace ProfileShift.Core
         {
             "Windows", "Program Files", "Program Files (x86)", "ProgramData",
             "PerfLogs", "$Recycle.Bin", "System Volume Information", "Users",
-            "pagefile.sys", "hiberfil.sys", "swapfile.sys"
+            "pagefile.sys", "hiberfil.sys", "swapfile.sys", "System_ProfileShift_Staging",
+            "Recovery", "$Windows.~BT", "$Windows.~WS", "$WinREAgent"
         };
 
         public static readonly string[] StandardUserFolders = new[]
@@ -20,7 +21,7 @@ namespace ProfileShift.Core
             "Favorites", "Contacts", "Links", "Searches", "Saved Games"
         };
 
-        public static List<string> GetRootDriveFolders()
+        public static List<string> GetRootDriveFolders(string? destinationFolder = null)
         {
             var result = new List<string>();
             string rootPath = Path.GetPathRoot(Environment.SystemDirectory) ?? @"C:\";
@@ -32,10 +33,20 @@ namespace ProfileShift.Core
                 foreach (var dir in dirs)
                 {
                     string name = Path.GetFileName(dir);
-                    if (!SystemRootExclusions.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    if (SystemRootExclusions.Contains(name, StringComparer.OrdinalIgnoreCase) ||
+                        ExclusionFilter.MatchesPattern(name, "ProfileShift_Backup*") ||
+                        ExclusionFilter.MatchesPattern(name, "System_ProfileShift_Staging*"))
                     {
-                        result.Add(dir);
+                        continue;
                     }
+
+                    if (!string.IsNullOrWhiteSpace(destinationFolder) &&
+                        ExclusionFilter.IsSameOrSubdirectory(dir, destinationFolder))
+                    {
+                        continue;
+                    }
+
+                    result.Add(dir);
                 }
             }
             catch { }
@@ -69,24 +80,33 @@ namespace ProfileShift.Core
             return folders;
         }
 
-        public static long CalculateTotalSize(List<string> folderPaths)
+        public static long CalculateTotalSize(List<string> folderPaths, IEnumerable<string>? excludedDirs = null)
         {
             long totalBytes = 0;
             foreach (var path in folderPaths)
             {
                 if (File.Exists(path))
                 {
-                    totalBytes += new FileInfo(path).Length;
+                    if (!ExclusionFilter.ShouldExcludeFile(path))
+                    {
+                        totalBytes += new FileInfo(path).Length;
+                    }
                 }
                 else if (Directory.Exists(path))
                 {
-                    totalBytes += GetDirectoryStats(path, System.Threading.CancellationToken.None).Bytes;
+                    if (!ExclusionFilter.ShouldExcludeDirectory(path, excludedDirs))
+                    {
+                        totalBytes += GetDirectoryStats(path, excludedDirs, System.Threading.CancellationToken.None).Bytes;
+                    }
                 }
             }
             return totalBytes;
         }
 
-        public static System.Threading.Tasks.Task<(long TotalBytes, long FileCount)> CalculateTotalStatsAsync(List<string> folderPaths, System.Threading.CancellationToken cancellationToken)
+        public static System.Threading.Tasks.Task<(long TotalBytes, long FileCount)> CalculateTotalStatsAsync(
+            List<string> folderPaths,
+            IEnumerable<string>? excludedDirs = null,
+            System.Threading.CancellationToken cancellationToken = default)
         {
             return System.Threading.Tasks.Task.Run(() =>
             {
@@ -107,9 +127,12 @@ namespace ProfileShift.Core
                     }
                     else if (Directory.Exists(path))
                     {
-                        var (bytes, count) = GetDirectoryStats(path, cancellationToken);
-                        totalBytes += bytes;
-                        fileCount += count;
+                        if (!ExclusionFilter.ShouldExcludeDirectory(path, excludedDirs))
+                        {
+                            var (bytes, count) = GetDirectoryStats(path, excludedDirs, cancellationToken);
+                            totalBytes += bytes;
+                            fileCount += count;
+                        }
                     }
                 }
 
@@ -117,7 +140,10 @@ namespace ProfileShift.Core
             }, cancellationToken);
         }
 
-        private static (long Bytes, long Count) GetDirectoryStats(string directoryPath, System.Threading.CancellationToken cancellationToken)
+        private static (long Bytes, long Count) GetDirectoryStats(
+            string directoryPath,
+            IEnumerable<string>? excludedDirs,
+            System.Threading.CancellationToken cancellationToken)
         {
             long size = 0;
             long count = 0;
@@ -134,11 +160,24 @@ namespace ProfileShift.Core
                 {
                     foreach (var subDir in Directory.GetDirectories(currentDir))
                     {
+                        if (cancellationToken.IsCancellationRequested) break;
+
+                        // Skip directory junction points and symbolic links to prevent infinite recursion loops
+                        try
+                        {
+                            var dirInfo = new DirectoryInfo(subDir);
+                            if ((dirInfo.Attributes & FileAttributes.ReparsePoint) != 0)
+                            {
+                                continue;
+                            }
+                        }
+                        catch { }
+
                         string subName = Path.GetFileName(subDir);
                         if (!subName.Equals("OneDrive", StringComparison.OrdinalIgnoreCase) &&
                             !subName.Equals("SharePoint", StringComparison.OrdinalIgnoreCase) &&
                             !subName.Equals("Dropbox", StringComparison.OrdinalIgnoreCase) &&
-                            !ExclusionFilter.ShouldExcludeDirectory(subDir))
+                            !ExclusionFilter.ShouldExcludeDirectory(subDir, excludedDirs))
                         {
                             dirQueue.Enqueue(subDir);
                         }
@@ -170,3 +209,4 @@ namespace ProfileShift.Core
         }
     }
 }
+

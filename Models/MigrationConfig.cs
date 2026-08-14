@@ -16,6 +16,7 @@ namespace ProfileShift.Models
 
         public List<string> SelectedUsers { get; set; } = new List<string>();
         public List<string> SelectedRootFolders { get; set; } = new List<string>();
+        public List<string> ExcludedRootFolders { get; set; } = new List<string>();
         public Dictionary<string, UserSelection> UserSelections { get; set; } = new Dictionary<string, UserSelection>();
 
         public List<PrinterInfo> Printers { get; set; } = new List<PrinterInfo>();
@@ -26,6 +27,7 @@ namespace ProfileShift.Models
     public class UserSelection
     {
         public List<string> Folders { get; set; } = new List<string>();
+        public List<string> ExcludedFolders { get; set; } = new List<string>();
         public List<string> Browsers { get; set; } = new List<string>();
         public UserSettings Settings { get; set; } = new UserSettings();
         public Dictionary<string, string> EnvironmentVariables { get; set; } = new Dictionary<string, string>();

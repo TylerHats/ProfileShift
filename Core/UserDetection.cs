@@ -3,13 +3,29 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
+using System.ComponentModel;
+
 namespace ProfileShift.Core
 {
-    public class UserProfile
+    public class UserProfile : INotifyPropertyChanged
     {
+        private bool _isSelected;
         public string Username { get; set; } = string.Empty;
         public string ProfilePath { get; set; } = string.Empty;
-        public bool IsSelected { get; set; }
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set
+            {
+                if (_isSelected != value)
+                {
+                    _isSelected = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
+                }
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
     }
 
     public static class UserDetection

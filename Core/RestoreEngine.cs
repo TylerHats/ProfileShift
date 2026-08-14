@@ -77,7 +77,7 @@ namespace ProfileShift.Core
 
                     if (Directory.Exists(srcUser))
                     {
-                        await Task.Run(() => RunCmd($"robocopy \"{srcUser}\" \"{dstUser}\" /E /COPY:DAT /DCOPY:DAT /R:0 /W:0 /MT:16 /NFL /NDL /NJH /NJS /nc /ns /np"));
+                        await Task.Run(() => RunCmd($"robocopy \"{srcUser}\" \"{dstUser}\" /E /COPY:DAT /DCOPY:DAT /XJ /R:0 /W:0 /MT:16 /NFL /NDL /NJH /NJS /nc /ns /np"));
                     }
                 }
 
@@ -89,7 +89,7 @@ namespace ProfileShift.Core
                         if (!string.Equals(dirName, "Users", StringComparison.OrdinalIgnoreCase))
                         {
                             string targetDriveDir = Path.Combine(@"C:\", dirName);
-                            await Task.Run(() => RunCmd($"robocopy \"{rootDir}\" \"{targetDriveDir}\" /E /COPY:DAT /DCOPY:DAT /R:0 /W:0 /MT:16 /NFL /NDL /NJH /NJS /nc /ns /np"));
+                            await Task.Run(() => RunCmd($"robocopy \"{rootDir}\" \"{targetDriveDir}\" /E /COPY:DAT /DCOPY:DAT /XJ /R:0 /W:0 /MT:16 /NFL /NDL /NJH /NJS /nc /ns /np"));
                         }
                     }
                 }
