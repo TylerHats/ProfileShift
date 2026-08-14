@@ -5,6 +5,14 @@
         Background="#2F3136" Foreground="#D9D9D9"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         FontFamily="Segoe UI" FontSize="13">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Themes/DarkTheme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+    
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

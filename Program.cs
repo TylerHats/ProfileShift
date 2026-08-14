@@ -70,6 +70,14 @@ namespace ProfileShift
             }
 
             var guiApp = new Application();
+            try
+            {
+                guiApp.Resources.MergedDictionaries.Add(new ResourceDictionary
+                {
+                    Source = new Uri("pack://application:,,,/UI/Themes/DarkTheme.xaml", UriKind.RelativeOrAbsolute)
+                });
+            }
+            catch { }
             guiApp.Run(new MainWindow());
         }
 
